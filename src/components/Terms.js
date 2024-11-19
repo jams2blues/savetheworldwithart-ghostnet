@@ -14,15 +14,6 @@ const StyledPaper = styled(Paper)`
   padding: 30px;
 `;
 
-const Preformatted = styled.pre`
-  background-color: #f5f5f5;
-  padding: 10px;
-  max-height: 300px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-`;
-
 const Terms = () => {
   return (
     <StyledContainer>

@@ -599,10 +599,20 @@ const GenerateContract = () => {
       <Section>
         <Alert severity="warning">
           <Typography variant="body2">
-            <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or altered once deployed. Save The World With Art™ holds no liability for any content you create or deploy. Always test thoroughly on Ghostnet before deploying to mainnet, as all actions are final and permanent. ⚠️ OBJKT might not display Collection Thumbnails over 254 Characters, so make em' teeny tiny!
-          </Typography>
-        </Alert>
-      </Section>
+            <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or altered once deployed. Save The World With Art™ holds no liability for any content you create or deploy. Always test thoroughly on{' '}
+            <Link
+              href="https://ghostnet.savetheworldwithart.io"
+              color="primary"
+              underline="hover"
+              target="_blank"
+              rel="noopener noreferrer"
+              >
+        Ghostnet
+      </Link>{' '}
+      before deploying to mainnet, as all actions are final and permanent. ⚠️ OBJKT might not display Collection Thumbnails over 254 Characters, so make em' teeny tiny!
+    </Typography>
+  </Alert>
+</Section>
 
       {/* Wallet Connection Status */}
       <div style={{ textAlign: 'center', marginBottom: '20px' }}>
