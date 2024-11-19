@@ -80,7 +80,7 @@ const CONTENT_KEY = 'content';
 
 const GenerateContract = () => {
   // Context and State Variables
-  const { Tezos, isWalletConnected, walletAddress, network } = useContext(WalletContext);
+  const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -457,7 +457,7 @@ const GenerateContract = () => {
         };
       }
 
-      const originationOp = await Tezos.wallet
+      const originationOp = await tezos.wallet
         .originate({
           code: modifiedMichelsonCode,
           storage: storage,
@@ -900,7 +900,7 @@ const GenerateContract = () => {
           <Typography variant="body2" style={{ marginTop: '10px' }}>
             Please check your contract on{' '}
             <Link
-              href={`https://better-call.dev/${network}/${contractAddress}/operations`}
+              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
               target="_blank"
               rel="noopener noreferrer"
               color="primary"
@@ -910,7 +910,7 @@ const GenerateContract = () => {
             </Link>{' '}
             or{' '}
             <Link
-              href={`https://${network === 'mainnet' ? '' : 'ghostnet.'}objkt.com/collections/${contractAddress}`}
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
               target="_blank"
               rel="noopener noreferrer"
               color="primary"
@@ -953,7 +953,7 @@ const GenerateContract = () => {
           <Typography variant="body2" style={{ marginTop: '10px' }}>
             You can also view your contract on{' '}
             <Link
-              href={`https://better-call.dev/${network}/${contractAddress}/operations`}
+              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -961,7 +961,7 @@ const GenerateContract = () => {
             </Link>{' '}
             or{' '}
             <Link
-              href={`https://${network === 'mainnet' ? '' : 'ghostnet.'}objkt.com/collections/${contractAddress}`}
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
               target="_blank"
               rel="noopener noreferrer"
             >
