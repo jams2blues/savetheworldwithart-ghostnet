@@ -9,7 +9,7 @@ import process from 'process';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import PasswordProtect from './PasswordProtect'; // Import the PasswordProtect component
+//import PasswordProtect from './PasswordProtect'; // Import the PasswordProtect component
 import { WalletProvider } from './contexts/WalletContext'; // Import WalletProvider
 
 // Setup globals after imports
