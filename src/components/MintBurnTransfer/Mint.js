@@ -1,6 +1,6 @@
 // frontend/src/components/MintBurnTransfer/Mint.js
 
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import {
   Typography,
@@ -22,7 +22,6 @@ import MintUpload from './MintUpload';
 import { Buffer } from 'buffer';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
-import { WalletContext } from '../../contexts/WalletContext';
 
 // Styled Components
 const Section = styled.div`
