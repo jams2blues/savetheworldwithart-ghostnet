@@ -383,9 +383,15 @@ const Mint = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
       if (artifactFile.type) {
         metadataMap.set('mimeType', stringToHex(artifactFile.type));
       }
+      // Corrected Royalties: decimals set to 4
       metadataMap.set(
         'royalties',
-        stringToHex(JSON.stringify({ decimals: 2, shares: { [toAddress]: Math.round(royaltiesValue * 100) } }))
+        stringToHex(
+          JSON.stringify({
+            decimals: 4,
+            shares: { [toAddress]: Math.round(royaltiesValue * 100) }, // 10% * 100 = 1000
+          })
+        )
       );
 
       // Handle attributes
