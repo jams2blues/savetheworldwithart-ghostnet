@@ -4,7 +4,6 @@ import React, { createContext, useState, useEffect, useCallback, useRef } from '
 import { BeaconWallet } from '@taquito/beacon-wallet';
 import { TezosToolkit } from '@taquito/taquito';
 import { NETWORKS } from '../config/networkConfig';
-import { BeaconEvent } from '@airgap/beacon-sdk';
 
 // Create the Wallet Context
 export const WalletContext = createContext();
@@ -13,9 +12,8 @@ export const WalletContext = createContext();
 export const WalletProvider = ({ children }) => {
   const [walletAddress, setWalletAddress] = useState('');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [network] = useState('ghostnet'); // Fixed to ghostnet
   const [tezos, setTezos] = useState(null);
-  
+
   // Using ref to store BeaconWallet instance to prevent multiple instances
   const beaconWalletRef = useRef(null);
 
@@ -23,8 +21,8 @@ export const WalletProvider = ({ children }) => {
   useEffect(() => {
     const initializeWallet = async () => {
       try {
-        console.log(`Initializing wallet for network: ${network}`);
-        const networkConfig = NETWORKS[network];
+        console.log('Initializing wallet for network: ghostnet');
+        const networkConfig = NETWORKS['ghostnet'];
 
         // Initialize BeaconWallet only if not already initialized
         if (!beaconWalletRef.current) {
@@ -54,14 +52,6 @@ export const WalletProvider = ({ children }) => {
           } else {
             console.log('No active account found during initialization.');
           }
-
-          // Subscribe to BeaconWallet events
-          beaconWallet.on(BeaconEvent.ACTIVE_ACCOUNT_SET, async () => {
-            const userAddress = await beaconWallet.getPKH();
-            setWalletAddress(userAddress);
-            setIsWalletConnected(!!userAddress);
-            console.log(`BeaconEvent.ACTIVE_ACCOUNT_SET: Wallet account set to ${userAddress}`);
-          });
         } else {
           console.log('BeaconWallet already initialized for the current network.');
         }
@@ -71,7 +61,7 @@ export const WalletProvider = ({ children }) => {
     };
 
     initializeWallet();
-  }, [network]);
+  }, []);
 
   // Connect Wallet Function
   const connectWallet = useCallback(async () => {
@@ -163,7 +153,6 @@ export const WalletProvider = ({ children }) => {
         isWalletConnected,
         connectWallet,
         disconnectWallet,
-        network,
         tezos,
       }}
     >

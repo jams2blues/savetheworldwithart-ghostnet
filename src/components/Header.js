@@ -27,9 +27,6 @@ const Header = () => {
     isWalletConnected,
     connectWallet,
     disconnectWallet,
-    // network, // Not needed for Mainnet frontend
-    // switchNetwork, // Not needed for Mainnet frontend
-    tezos,
   } = useContext(WalletContext);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
@@ -37,8 +34,6 @@ const Header = () => {
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
-
-  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <>

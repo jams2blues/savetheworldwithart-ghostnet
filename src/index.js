@@ -16,7 +16,7 @@ import { WalletProvider } from './contexts/WalletContext'; // Import WalletProvi
 window.Buffer = Buffer;
 window.process = process;
 
-// Suppress specific warnings
+// Suppress specific warnings (if necessary)
 const originalConsoleError = console.error;
 console.error = (...args) => {
   if (/React Router Future Flag Warning/.test(args[0])) {
@@ -25,6 +25,7 @@ console.error = (...args) => {
   originalConsoleError.apply(console, args);
 };
 
+// Create root and render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
