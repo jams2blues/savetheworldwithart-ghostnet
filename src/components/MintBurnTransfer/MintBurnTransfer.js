@@ -8,6 +8,7 @@ import {
   Alert,
   TextField,
   CircularProgress,
+  Link, // Ensure Link is imported
 } from '@mui/material';
 import { WalletContext } from '../../contexts/WalletContext';
 import Mint from './Mint';
