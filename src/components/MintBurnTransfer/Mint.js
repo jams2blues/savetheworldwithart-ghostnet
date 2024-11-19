@@ -565,6 +565,7 @@ const Mint = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
               <MenuItem value="">Select a License</MenuItem>
               <MenuItem value="CC0 (Public Domain)">CC0 (Public Domain)</MenuItem>
               <MenuItem value="All Rights Reserved">All Rights Reserved</MenuItem>
+              <MenuItem value="On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z">On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z</MenuItem>
               <MenuItem value="CC BY 4.0">CC BY 4.0</MenuItem>
               <MenuItem value="CC BY-SA 4.0">CC BY-SA 4.0</MenuItem>
               <MenuItem value="CC BY-ND 4.0">CC BY-ND 4.0</MenuItem>

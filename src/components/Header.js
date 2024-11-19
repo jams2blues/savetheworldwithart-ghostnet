@@ -54,6 +54,9 @@ const Header = () => {
           <StyledLink to="/mint-burn-transfer">
             <Button color="inherit">Mint/Burn/Transfer</Button>
           </StyledLink>
+          <StyledLink to="/on-chain-license"> {/* New Navigation Link */}
+            <Button color="inherit">On-Chain NFT License 2.0</Button>
+          </StyledLink>
           {!isWalletConnected ? (
             <Button color="inherit" onClick={connectWallet} startIcon={<AccountBalanceWalletIcon />}>
               Connect Wallet

@@ -8,6 +8,7 @@ import GenerateContract from './components/GenerateContract';
 import ImpactMetrics from './components/ImpactMetrics';
 import MintBurnTransfer from './components/MintBurnTransfer/MintBurnTransfer';
 import Terms from './components/Terms';
+import OnChainLicense from './components/OnChainLicense'; // Import the new component
 import styled from 'styled-components';
 
 const MainContainer = styled.div`
@@ -28,6 +29,7 @@ function App() {
           <Route path="/generate" element={<GenerateContract />} />
           <Route path="/mint-burn-transfer" element={<MintBurnTransfer />} />
           <Route path="/terms" element={<Terms />} />
+          <Route path="/on-chain-license" element={<OnChainLicense />} /> {/* Add new route */}
           {/* Add other routes as needed */}
         </Routes>
       </MainContainer>
