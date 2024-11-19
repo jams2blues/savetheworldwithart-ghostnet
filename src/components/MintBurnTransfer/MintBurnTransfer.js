@@ -54,7 +54,7 @@ const detectContractVersion = (entrypoints) => {
 };
 
 const MintBurnTransfer = () => {
-  const { Tezos, isWalletConnected } = useContext(WalletContext);
+  const { tezos, isWalletConnected } = useContext(WalletContext);
   const [contractAddress, setContractAddress] = useState('');
   const [contractMetadata, setContractMetadata] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -70,7 +70,7 @@ const MintBurnTransfer = () => {
     }
     setLoading(true);
     try {
-      const contract = await Tezos.contract.at(contractAddress);
+      const contract = await tezos.contract.at(contractAddress);
       const entrypointsWrapper = contract.entrypoints; // Access as a property
       console.log('Entrypoints Wrapper:', entrypointsWrapper);
       
@@ -274,7 +274,7 @@ const MintBurnTransfer = () => {
               {action === 'mint' && (
                 <Mint
                   contractAddress={contractAddress}
-                  Tezos={Tezos}
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -282,7 +282,7 @@ const MintBurnTransfer = () => {
               {action === 'burn' && (
                 <Burn
                   contractAddress={contractAddress}
-                  Tezos={Tezos}
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -290,7 +290,7 @@ const MintBurnTransfer = () => {
               {action === 'transfer' && (
                 <Transfer
                   contractAddress={contractAddress}
-                  Tezos={Tezos}
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -298,7 +298,7 @@ const MintBurnTransfer = () => {
               {action === 'balance_of' && (
                 <BalanceOf
                   contractAddress={contractAddress}
-                  Tezos={Tezos}
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -306,7 +306,7 @@ const MintBurnTransfer = () => {
               {action === 'update_operators' && (
                 <UpdateOperators
                   contractAddress={contractAddress}
-                  Tezos={Tezos}
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />

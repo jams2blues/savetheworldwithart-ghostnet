@@ -38,8 +38,7 @@ const MAX_EDITIONS = 10000; // Maximum editions cap
 // Helper function to convert string to hex
 const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
 
-const Mint = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
-  const { network } = useContext(WalletContext); // Access network from context
+const Mint = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
 
   // State variables for form data
   const [formData, setFormData] = useState({
@@ -177,7 +176,7 @@ const Mint = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
   // Function to fetch current minted editions for v2
   const getCurrentMintedEditions = async () => {
     try {
-      const contract = await Tezos.wallet.at(contractAddress);
+      const contract = await tezos.wallet.at(contractAddress);
       const storage = await contract.storage();
 
       if (contractVersion === 'v1') {
@@ -405,7 +404,7 @@ const Mint = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
 
       // Removed 'mimeType' as it's unused to fix ESLint warning
 
-      const contract = await Tezos.wallet.at(contractAddress);
+      const contract = await tezos.wallet.at(contractAddress);
 
       let op;
       if (contractVersion === 'v1') {
@@ -732,7 +731,7 @@ const Mint = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
           <Typography variant="body2" style={{ marginTop: '10px' }}>
             Please check your contract on{' '}
             <Link
-              href={`https://better-call.dev/${network}/${contractAddress}/operations`}
+              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
               target="_blank"
               rel="noopener noreferrer"
               color="primary"
@@ -742,7 +741,7 @@ const Mint = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
             </Link>{' '}
             or{' '}
             <Link
-              href={`https://${network === 'mainnet' ? '' : 'ghostnet.'}objkt.com/collections/${contractAddress}`}
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
               target="_blank"
               rel="noopener noreferrer"
               color="primary"

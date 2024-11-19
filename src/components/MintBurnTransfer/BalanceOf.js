@@ -9,7 +9,7 @@ import {
   Grid,
 } from '@mui/material';
 
-const BalanceOf = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
+const BalanceOf = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
   const [ownerAddress, setOwnerAddress] = useState('');
   const [tokenId, setTokenId] = useState('');
   const [balance, setBalance] = useState(null);
@@ -54,7 +54,7 @@ const BalanceOf = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => 
 
     try {
       setLoading(true);
-      const contract = await Tezos.contract.at(contractAddress);
+      const contract = await tezos.contract.at(contractAddress);
       const storage = await contract.storage();
 
       // Removed console logs for production

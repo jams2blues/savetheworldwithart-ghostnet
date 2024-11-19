@@ -13,7 +13,7 @@ import {
   InputLabel,
 } from '@mui/material';
 
-const UpdateOperators = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
+const UpdateOperators = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
   const [operatorType, setOperatorType] = useState('add_operator');
   const [ownerAddress, setOwnerAddress] = useState('');
   const [operatorAddress, setOperatorAddress] = useState('');
@@ -28,7 +28,7 @@ const UpdateOperators = ({ contractAddress, Tezos, setSnackbar, contractVersion 
 
     try {
       setLoading(true);
-      const contract = await Tezos.wallet.at(contractAddress);
+      const contract = await tezos.wallet.at(contractAddress);
 
       let op;
       if (contractVersion === 'v1') {

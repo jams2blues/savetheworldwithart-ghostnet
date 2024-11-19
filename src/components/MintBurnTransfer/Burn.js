@@ -9,7 +9,7 @@ import {
   Grid,
 } from '@mui/material';
 
-const Burn = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
+const Burn = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
   const [tokenId, setTokenId] = useState('');
   const [amount, setAmount] = useState('1'); // Only for v2
   const [loading, setLoading] = useState(false);
@@ -22,7 +22,7 @@ const Burn = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
 
     try {
       setLoading(true);
-      const contract = await Tezos.wallet.at(contractAddress);
+      const contract = await tezos.wallet.at(contractAddress);
 
       let op;
       if (contractVersion === 'v1') {

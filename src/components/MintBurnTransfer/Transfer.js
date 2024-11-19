@@ -9,7 +9,7 @@ import {
   Grid,
 } from '@mui/material';
 
-const Transfer = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
+const Transfer = ({ contractAddress, tezos, setSnackbar, contractVersion }) => {
   const [fromAddress, setFromAddress] = useState('');
   const [toAddress, setToAddress] = useState('');
   const [tokenId, setTokenId] = useState('');
@@ -24,7 +24,7 @@ const Transfer = ({ contractAddress, Tezos, setSnackbar, contractVersion }) => {
 
     try {
       setLoading(true);
-      const contract = await Tezos.wallet.at(contractAddress);
+      const contract = await tezos.wallet.at(contractAddress);
 
       const amountValue = parseInt(amount);
       if (isNaN(amountValue) || amountValue <= 0) {
