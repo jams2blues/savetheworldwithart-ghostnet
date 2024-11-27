@@ -2,7 +2,12 @@
 
 import React from 'react';
 import styled from 'styled-components';
-import { Typography, Container, Paper, Link } from '@mui/material';
+import { Typography, Container, Paper, Link, Alert, Box } from '@mui/material';
+
+// Optional: Define Section using Box if not already defined
+const Section = styled(Box)`
+  margin-bottom: 20px;
+`;
 
 const StyledContainer = styled(Container)`
   padding: 40px;
@@ -18,6 +23,29 @@ const Terms = () => {
   return (
     <StyledContainer>
       <StyledPaper elevation={3}>
+
+        {/* Liability Disclaimer */}
+        <Section>
+          <Alert severity="warning">
+            <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
+              <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full
+              responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or
+              altered once deployed. Save The World With Art™ holds no liability for any content you create or deploy.
+              Always test thoroughly on{' '}
+              <Link
+                href="https://ghostnet.savetheworldwithart.io"
+                color="primary"
+                underline="hover"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ghostnet
+              </Link>{' '}
+              before deploying to mainnet, as all actions are final and permanent.  If you make a mistake you can hide the collection from your main objkt portfolio or burn any erroneous tokens. ⚠️ OBJKT might not display
+              Collection Thumbnails over 254 Characters, so make em' teeny tiny!
+            </Typography>
+          </Alert>
+        </Section>
         <Typography variant="h4" gutterBottom>
           Terms and Conditions
         </Typography>
