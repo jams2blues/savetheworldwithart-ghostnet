@@ -6,13 +6,20 @@ import {
   Toolbar,
   Typography,
   Button,
+  IconButton,
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemText,
   Snackbar,
   Alert,
+  Box,
 } from '@mui/material';
 import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { WalletContext } from '../contexts/WalletContext';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import MenuIcon from '@mui/icons-material/Menu';
 import { ReactComponent as Logo } from '../logo.svg'; // Ensure the path is correct
 
 const StyledLink = styled(Link)`
@@ -30,33 +37,83 @@ const Header = () => {
   } = useContext(WalletContext);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  const toggleDrawer = (open) => () => {
+    setDrawerOpen(open);
+  };
+
+  const menuItems = [
+    { text: 'Home', link: '/' },
+    { text: 'Generate Contract', link: '/generate' },
+    { text: 'Mint/Burn/Transfer', link: '/mint-burn-transfer' },
+    { text: 'On-Chain NFT License 2.0', link: '/on-chain-license' },
+  ];
+
   return (
     <>
       <AppBar position="static">
         <Toolbar>
+          {/* Hamburger Menu for Mobile */}
+          <Box sx={{ display: { xs: 'block', sm: 'none' }, mr: 2 }}>
+            <IconButton
+              edge="start"
+              color="inherit"
+              aria-label="menu"
+              onClick={toggleDrawer(true)}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Drawer
+              anchor="left"
+              open={drawerOpen}
+              onClose={toggleDrawer(false)}
+            >
+              <Box
+                sx={{ width: 250 }}
+                role="presentation"
+                onClick={toggleDrawer(false)}
+                onKeyDown={toggleDrawer(false)}
+              >
+                <List>
+                  {menuItems.map((item) => (
+                    <ListItemButton
+                      key={item.text}
+                      component={Link}
+                      to={item.link}
+                    >
+                      <ListItemText primary={item.text} />
+                    </ListItemButton>
+                  ))}
+                </List>
+              </Box>
+            </Drawer>
+          </Box>
+
+          {/* Logo */}
           <Link to="/">
             <Logo style={{ height: '40px', width: '40px', marginRight: '15px' }} />
           </Link>
-          <Typography variant="h6" style={{ flexGrow: 1 }}>
+
+          {/* Title */}
+          <Typography variant="h6" sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>
             Save The World With Art™ Beta
           </Typography>
-          <StyledLink to="/">
-            <Button color="inherit">Home</Button>
-          </StyledLink>
-          <StyledLink to="/generate">
-            <Button color="inherit">Generate Contract</Button>
-          </StyledLink>
-          <StyledLink to="/mint-burn-transfer">
-            <Button color="inherit">Mint/Burn/Transfer</Button>
-          </StyledLink>
-          <StyledLink to="/on-chain-license"> {/* New Navigation Link */}
-            <Button color="inherit">On-Chain NFT License 2.0</Button>
-          </StyledLink>
+
+          {/* Navigation Links for Desktop */}
+          <Box sx={{ display: { xs: 'none', sm: 'block' }, flexGrow: 1 }}>
+            {menuItems.map((item) => (
+              <StyledLink key={item.text} to={item.link}>
+                <Button color="inherit">{item.text}</Button>
+              </StyledLink>
+            ))}
+          </Box>
+
+          {/* Wallet Connection Button */}
           {!isWalletConnected ? (
             <Button color="inherit" onClick={connectWallet} startIcon={<AccountBalanceWalletIcon />}>
               Connect Wallet

@@ -1,3 +1,5 @@
+// src/components/GenerateContract.js
+
 import React, { useState, useEffect, useContext } from 'react';
 import styled from 'styled-components';
 import {
@@ -21,6 +23,9 @@ import {
   Checkbox,
   FormControlLabel,
   Link,
+  useMediaQuery,
+  useTheme,
+  Box,
 } from '@mui/material';
 import { WalletContext } from '../contexts/WalletContext';
 import NFTPreview from './NFTPreview';
@@ -99,12 +104,15 @@ const GenerateContract = () => {
   const [deploying, setDeploying] = useState(false);
   const [modifiedMichelsonCode, setModifiedMichelsonCode] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, data: null });
-  const [contractDialogOpen, setContractDialogOpen] = useState(false); // New state for contract dialog
+  const [contractDialogOpen, setContractDialogOpen] = useState(false);
 
   const [michelsonCode, setMichelsonCode] = useState('');
 
   // Define the symbol validation regex
   const symbolPattern = /^[A-Za-z0-9]{3,5}$/;
+
+  const theme = useTheme();
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Fetch and Prepare Michelson Code
   useEffect(() => {
@@ -565,14 +573,15 @@ const GenerateContract = () => {
 
   return (
     <Container elevation={3}>
-      <Typography variant="h4" gutterBottom align="center">
+      <Typography variant="h4" gutterBottom align="center" sx={{ fontSize: { xs: '1.5rem', md: '2.5rem' } }}>
         Deploy Your On-Chain Tezos NFT Smart Contract
       </Typography>
-      <Typography variant="h4" gutterBottom align="center">
+      <Typography variant="h5" gutterBottom align="center" sx={{ fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
         NFT Collection Contract
       </Typography>
-      <Typography variant="body1" gutterBottom align="center">
-        Ready to mint your NFTs fully on-chain? Just fill in the details below, and we’ll handle the metadata magic, swapping in your info and wallet address before deploying it on Tezos with Taquito. Big thanks to{' '}
+      <Typography variant="body1" gutterBottom align="center" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
+        Ready to mint your NFTs fully on-chain? Just fill in the details below, and we’ll handle the metadata magic,
+        swapping in your info and wallet address before deploying it on Tezos with Taquito. Big thanks to{' '}
         <Link
           href="https://x.com/JestemZero"
           target="_blank"
@@ -598,34 +607,42 @@ const GenerateContract = () => {
       {/* Liability Disclaimer */}
       <Section>
         <Alert severity="warning">
-          <Typography variant="body2">
-            <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or altered once deployed. Save The World With Art™ holds no liability for any content you create or deploy. Always test thoroughly on{' '}
+          <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
+            <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full
+            responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or
+            altered once deployed. Save The World With Art™ holds no liability for any content you create or deploy.
+            Always test thoroughly on{' '}
             <Link
               href="https://ghostnet.savetheworldwithart.io"
               color="primary"
               underline="hover"
               target="_blank"
               rel="noopener noreferrer"
-              >
-        Ghostnet
-      </Link>{' '}
-      before deploying to mainnet, as all actions are final and permanent. ⚠️ OBJKT might not display Collection Thumbnails over 254 Characters, so make em' teeny tiny!
-    </Typography>
-  </Alert>
-</Section>
+            >
+              Ghostnet
+            </Link>{' '}
+            before deploying to mainnet, as all actions are final and permanent. ⚠️ OBJKT might not display
+            Collection Thumbnails over 254 Characters, so make em' teeny tiny!
+          </Typography>
+        </Alert>
+      </Section>
 
       {/* Wallet Connection Status */}
       <div style={{ textAlign: 'center', marginBottom: '20px' }}>
         {isWalletConnected ? (
-          <Typography variant="subtitle1">Wallet Connected: {walletAddress}</Typography>
+          <Typography variant="subtitle1" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
+            Wallet Connected: {walletAddress}
+          </Typography>
         ) : (
-          <Typography variant="subtitle1">Please connect your wallet to proceed.</Typography>
+          <Typography variant="subtitle1" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
+            Please connect your wallet to proceed.
+          </Typography>
         )}
       </div>
 
       {/* Step 1: Fill Contract Details */}
       <Section>
-        <Typography variant="h6" gutterBottom>
+        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
           Step 1: Fill in Your Collection Details
         </Typography>
         <form noValidate autoComplete="off">
@@ -828,9 +845,9 @@ const GenerateContract = () => {
                 label={
                   <span>
                     I agree to the{' '}
-                    <a href="/terms" target="_blank" rel="noopener noreferrer">
+                    <Link href="/terms" target="_blank" rel="noopener noreferrer">
                       Terms and Conditions
-                    </a>
+                    </Link>
                     .
                   </span>
                 }
@@ -853,9 +870,9 @@ const GenerateContract = () => {
             )}
 
             {/* Buttons */}
-            <Grid item xs={12} style={{ textAlign: 'center', marginTop: '20px' }}>
+            <Grid item xs={12} sx={{ textAlign: 'center', marginTop: '20px' }}>
               {/* "Copy Contract" Button */}
-              <div style={{ marginBottom: '10px' }}>
+              <Box sx={{ mb: 2 }}>
                 <Typography variant="caption" display="block" gutterBottom>
                   for advanced users
                 </Typography>
@@ -864,13 +881,18 @@ const GenerateContract = () => {
                   color="primary"
                   onClick={handleCopyContract}
                   disabled={!modifiedMichelsonCode}
+                  sx={{
+                    px: { xs: 2, md: 4 },
+                    py: { xs: 1, md: 2 },
+                    fontSize: { xs: '0.8rem', md: '1rem' },
+                  }}
                 >
                   Copy Contract
                 </Button>
-              </div>
+              </Box>
 
               {/* "Deploy Contract" Button */}
-              <div>
+              <Box>
                 <Typography variant="caption" display="block" gutterBottom>
                   Get your collection on-chain so you can start minting!
                 </Typography>
@@ -880,10 +902,15 @@ const GenerateContract = () => {
                   onClick={handleDeployContract}
                   disabled={deploying || !modifiedMichelsonCode || Object.keys(formErrors).length > 0}
                   startIcon={deploying && <CircularProgress size={20} />}
+                  sx={{
+                    px: { xs: 3, md: 6 },
+                    py: { xs: 1, md: 2 },
+                    fontSize: { xs: '0.8rem', md: '1rem' },
+                  }}
                 >
                   {deploying ? 'Deploying...' : 'Deploy Contract'}
                 </Button>
-              </div>
+              </Box>
             </Grid>
           </Grid>
         </form>
@@ -892,10 +919,10 @@ const GenerateContract = () => {
       {/* Step 2: Display Contract Address */}
       {contractAddress && (
         <Section>
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
             Step 2: Your Contract is Deployed
           </Typography>
-          <Typography variant="body2" gutterBottom>
+          <Typography variant="body2" gutterBottom sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
             Your contract has been successfully deployed. Below is your contract address. You can use this address to mint NFTs.
           </Typography>
           <Preformatted>{contractAddress}</Preformatted>
@@ -903,11 +930,16 @@ const GenerateContract = () => {
             variant="contained"
             color="secondary"
             onClick={() => navigator.clipboard.writeText(contractAddress)}
-            style={{ marginTop: '10px' }}
+            sx={{
+              mt: 2,
+              px: { xs: 3, md: 6 },
+              py: { xs: 1, md: 2 },
+              fontSize: { xs: '0.8rem', md: '1rem' },
+            }}
           >
             Copy Contract Address
           </Button>
-          <Typography variant="body2" style={{ marginTop: '10px' }}>
+          <Typography variant="body2" sx={{ mt: 2, fontSize: { xs: '0.9rem', md: '1rem' } }}>
             Please check your contract on{' '}
             <Link
               href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
@@ -945,10 +977,11 @@ const GenerateContract = () => {
         }}
         aria-labelledby="contract-dialog-title"
         aria-describedby="contract-dialog-description"
+        fullScreen={fullScreen}
       >
         <DialogTitle id="contract-dialog-title">Your Contract Address</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" gutterBottom>
+          <Typography variant="body1" gutterBottom sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
             Your contract has been successfully deployed. Please copy and save your contract address.
           </Typography>
           <Preformatted>{contractAddress}</Preformatted>
@@ -956,11 +989,17 @@ const GenerateContract = () => {
             variant="contained"
             color="primary"
             onClick={() => navigator.clipboard.writeText(contractAddress)}
-            style={{ marginTop: '10px' }}
+            sx={{
+              mt: 2,
+              px: { xs: 3, md: 6 },
+              py: { xs: 1, md: 2 },
+              fontSize: { xs: '0.8rem', md: '1rem' },
+            }}
+            fullWidth={fullScreen}
           >
             Copy Contract Address
           </Button>
-          <Typography variant="body2" style={{ marginTop: '10px' }}>
+          <Typography variant="body2" sx={{ mt: 2, fontSize: { xs: '0.9rem', md: '1rem' } }}>
             You can also view your contract on{' '}
             <Link
               href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
@@ -981,7 +1020,7 @@ const GenerateContract = () => {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseContractDialog} color="primary">
+          <Button onClick={handleCloseContractDialog} color="primary" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
             I have saved it
           </Button>
         </DialogActions>
@@ -993,21 +1032,23 @@ const GenerateContract = () => {
         onClose={handleCloseDialog}
         aria-labelledby="confirm-deployment-title"
         aria-describedby="confirm-deployment-description"
+        fullScreen={fullScreen}
       >
         <DialogTitle id="confirm-deployment-title">Confirm Deployment</DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-deployment-description">
-            Are you sure you want to deploy this smart contract? This action is irreversible, and the contract cannot be deleted once deployed on the Tezos mainnet.
+            Are you sure you want to deploy this smart contract? This action is irreversible, and the contract
+            cannot be deleted once deployed on the Tezos mainnet.
           </DialogContentText>
-          <Typography variant="subtitle2" color="error" style={{ marginTop: '10px' }}>
+          <Typography variant="subtitle2" color="error" sx={{ mt: 2, fontSize: { xs: '0.8rem', md: '1rem' } }}>
             **Please ensure all the information is correct before proceeding.**
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary">
+          <Button onClick={handleCloseDialog} color="primary" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
             Cancel
           </Button>
-          <Button onClick={confirmDeployment} color="primary" autoFocus>
+          <Button onClick={confirmDeployment} color="primary" autoFocus sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
             Confirm Deployment
           </Button>
         </DialogActions>
