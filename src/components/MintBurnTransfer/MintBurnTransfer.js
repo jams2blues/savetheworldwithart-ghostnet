@@ -12,6 +12,7 @@ import {
   CircularProgress,
   Grid,
   Box,
+  Stack, // Import Stack
 } from '@mui/material';
 import { WalletContext } from '../../contexts/WalletContext';
 import Mint from './Mint';
@@ -25,9 +26,17 @@ const StyledPaper = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
   max-width: 800px;
+  width: 95%;
+  box-sizing: border-box;
+
+  @media (max-width: 900px) {
+    padding: 15px;
+    width: 98%;
+  }
+
   @media (max-width: 600px) {
     padding: 10px;
-    margin: 10px auto;
+    width: 100%;
   }
 `;
 
@@ -36,36 +45,11 @@ const Disclaimer = styled.div`
   padding: 10px;
   background-color: #fff8e1;
   border-left: 6px solid #ffeb3b;
-  @media (max-width: 600px) {
-    padding: 5px;
-    margin-top: 10px;
-  }
+  box-sizing: border-box;
 `;
 
-// Helper function to detect contract version based on entrypoints
-const detectContractVersion = (entrypoints) => {
-  const v2UniqueEntrypoints = [
-    'add_child',
-    'add_parent',
-    'remove_child',
-    'remove_parent',
-    'set_pause',
-  ];
-
-  // Extract all entrypoint names and convert to lowercase for case-insensitive comparison
-  const entrypointNames = Object.keys(entrypoints).map(ep => ep.toLowerCase());
-  console.log('Entrypoint Names:', entrypointNames);
-
-  // Identify which unique v2 entrypoints are present
-  const v2EntrypointsPresent = v2UniqueEntrypoints.filter(ep => entrypointNames.includes(ep));
-
-  console.log(`v2 unique entrypoints present: ${v2EntrypointsPresent.join(', ')}`);
-
-  // Determine contract version based on the presence of unique v2 entrypoints
-  return v2EntrypointsPresent.length >= 2 ? 'v2' : 'v1';
-};
-
 const MintBurnTransfer = () => {
+  // Corrected destructuring: use 'tezos' instead of 'Tezos'
   const { tezos, isWalletConnected } = useContext(WalletContext);
   const [contractAddress, setContractAddress] = useState('');
   const [contractMetadata, setContractMetadata] = useState(null);
@@ -73,6 +57,28 @@ const MintBurnTransfer = () => {
   const [action, setAction] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [contractVersion, setContractVersion] = useState('');
+
+  // Function to detect contract version based on entrypoints
+  const detectContractVersion = (entrypoints) => {
+    const v2UniqueEntrypoints = [
+      'add_child',
+      'add_parent',
+      'remove_child',
+      'remove_parent',
+    ];
+    
+    // Extract all entrypoint names and convert to lowercase for case-insensitive comparison
+    const entrypointNames = Object.keys(entrypoints).map(ep => ep.toLowerCase());
+    console.log('Entrypoint Names:', entrypointNames);
+    
+    // Identify which unique v2 entrypoints are present
+    const v2EntrypointsPresent = v2UniqueEntrypoints.filter(ep => entrypointNames.includes(ep));
+    
+    console.log(`v2 unique entrypoints present: ${v2EntrypointsPresent.join(', ')}`);
+    
+    // Determine contract version based on the presence of unique v2 entrypoints
+    return v2EntrypointsPresent.length >= 2 ? 'v2' : 'v1';
+  };
 
   // Function to fetch contract metadata and detect version
   const fetchContractMetadata = async () => {
@@ -82,6 +88,7 @@ const MintBurnTransfer = () => {
     }
     setLoading(true);
     try {
+      // Use 'tezos' instead of 'Tezos'
       const contract = await tezos.contract.at(contractAddress);
       const entrypointsWrapper = contract.entrypoints; // Access as a property
       console.log('Entrypoints Wrapper:', entrypointsWrapper);
@@ -243,103 +250,139 @@ const MintBurnTransfer = () => {
               </Grid>
               <Grid container spacing={2} sx={{ mt: 3 }}>
                 <Grid item xs={12}>
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      onClick={() => handleActionClick('mint')}
-                      sx={{
-                        m: 1,
-                        px: { xs: 2, md: 4 },
-                        py: { xs: 1, md: 2 },
-                        fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      }}
+                  {/* Use Stack for vertical stacking */}
+                  <Stack
+                    direction="column"
+                    spacing={2}
+                    alignItems="center"
+                    sx={{ width: '100%' }}
+                  >
+                    {/* Mint Button and Description */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
                     >
-                      Mint
-                    </Button>
-                    <Typography variant="body2" sx={{ m: 1, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        onClick={() => handleActionClick('mint')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Mint
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       {contractVersion === 'v2'
                         ? 'Mint multiple editions of an NFT to a recipient.'
                         : 'Mint a single edition NFT to a recipient.'}
                     </Typography>
 
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      onClick={() => handleActionClick('burn')}
-                      sx={{
-                        m: 1,
-                        px: { xs: 2, md: 4 },
-                        py: { xs: 1, md: 2 },
-                        fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      }}
+                    {/* Burn Button and Description */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
                     >
-                      Burn
-                    </Button>
-                    <Typography variant="body2" sx={{ m: 1, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      <Button
+                        variant="contained"
+                        color="secondary"
+                        onClick={() => handleActionClick('burn')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Burn
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       {contractVersion === 'v2'
                         ? 'Burn a specified amount of editions of an NFT.'
                         : 'Burn a single edition of an NFT.'}
                     </Typography>
 
-                    <Button
-                      variant="contained"
-                      color="warning"
-                      onClick={() => handleActionClick('transfer')}
-                      sx={{
-                        m: 1,
-                        px: { xs: 2, md: 4 },
-                        py: { xs: 1, md: 2 },
-                        fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      }}
+                    {/* Transfer Button and Description */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
                     >
-                      Transfer
-                    </Button>
-                    <Typography variant="body2" sx={{ m: 1, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      <Button
+                        variant="contained"
+                        color="warning"
+                        onClick={() => handleActionClick('transfer')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Transfer
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       Transfer NFTs from one address to another.
                     </Typography>
 
-                    <Button
-                      variant="contained"
-                      color="info"
-                      onClick={() => handleActionClick('balance_of')}
-                      sx={{
-                        m: 1,
-                        px: { xs: 2, md: 4 },
-                        py: { xs: 1, md: 2 },
-                        fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      }}
+                    {/* Balance Of Button and Description */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
                     >
-                      Balance Of
-                    </Button>
-                    <Typography variant="body2" sx={{ m: 1, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      <Button
+                        variant="contained"
+                        color="info"
+                        onClick={() => handleActionClick('balance_of')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Balance Of
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       Check the balance of NFTs for a specific owner and token ID.
                     </Typography>
 
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      onClick={() => handleActionClick('update_operators')}
-                      sx={{
-                        m: 1,
-                        px: { xs: 2, md: 4 },
-                        py: { xs: 1, md: 2 },
-                        fontSize: { xs: '0.75rem', md: '0.875rem' },
-                      }}
+                    {/* Update Operators Button and Description */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
                     >
-                      Update Operators
-                    </Button>
-                    <Typography variant="body2" sx={{ m: 1, fontSize: { xs: '0.7rem', md: '0.875rem' } }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => handleActionClick('update_operators')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Update Operators
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       Add or remove operators who can manage your NFTs on your behalf.
                     </Typography>
-                  </Box>
+                  </Stack>
                 </Grid>
               </Grid>
               {/* Render the selected action component */}
               {action === 'mint' && (
                 <Mint
                   contractAddress={contractAddress}
-                  tezos={tezos}
+                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -347,7 +390,7 @@ const MintBurnTransfer = () => {
               {action === 'burn' && (
                 <Burn
                   contractAddress={contractAddress}
-                  tezos={tezos}
+                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -355,7 +398,7 @@ const MintBurnTransfer = () => {
               {action === 'transfer' && (
                 <Transfer
                   contractAddress={contractAddress}
-                  tezos={tezos}
+                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -363,7 +406,7 @@ const MintBurnTransfer = () => {
               {action === 'balance_of' && (
                 <BalanceOf
                   contractAddress={contractAddress}
-                  tezos={tezos}
+                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -371,7 +414,7 @@ const MintBurnTransfer = () => {
               {action === 'update_operators' && (
                 <UpdateOperators
                   contractAddress={contractAddress}
-                  tezos={tezos}
+                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />

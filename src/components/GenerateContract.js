@@ -23,14 +23,14 @@ import {
   Checkbox,
   FormControlLabel,
   Link,
-  useMediaQuery,
-  useTheme,
-  Box,
+  Tooltip,
 } from '@mui/material';
 import { WalletContext } from '../contexts/WalletContext';
 import NFTPreview from './NFTPreview';
 import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
+import { BigNumber } from 'bignumber.js';
+import InfoIcon from '@mui/icons-material/Info';
 
 // Styled Components
 const Container = styled(Paper)`
@@ -54,17 +54,27 @@ const Preformatted = styled.pre`
   overflow: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+
+  @media (max-width: 600px) {
+    max-height: 200px;
+    font-size: 0.8rem;
+  }
 `;
 
-// Helper Functions
-const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
+// Convert string to hexadecimal
+const stringToHex = (str) => {
+  return [...str].map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
+};
 
+// Validate Tezos address using regex
 const isValidTezosAddress = (address) => {
   const tezosAddressRegex = /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/;
   return tezosAddressRegex.test(address);
 };
 
-// Function to Calculate Byte Size of Data URI
+// Calculate byte size of Data URI
 const getByteSize = (dataUri) => {
   try {
     const base64Data = dataUri.split(',')[1];
@@ -82,6 +92,9 @@ const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 
 const CONTENT_KEY = 'content';
+
+// Define storage cost per byte (tez per byte)
+const STORAGE_COST_PER_BYTE = 0.00025; // tez per byte
 
 const GenerateContract = () => {
   // Context and State Variables
@@ -107,12 +120,16 @@ const GenerateContract = () => {
   const [contractDialogOpen, setContractDialogOpen] = useState(false);
 
   const [michelsonCode, setMichelsonCode] = useState('');
+  const [estimatedFeeTez, setEstimatedFeeTez] = useState(null);
+  // eslint-disable-next-line
+  const [estimatedGasLimit, setEstimatedGasLimit] = useState(null);
+  // eslint-disable-next-line
+  const [estimatedStorageLimit, setEstimatedStorageLimit] = useState(null);
+  // eslint-disable-next-line
+  const [estimatedBalanceChangeTez, setEstimatedBalanceChangeTez] = useState(null); // New state for balance change
 
   // Define the symbol validation regex
   const symbolPattern = /^[A-Za-z0-9]{3,5}$/;
-
-  const theme = useTheme();
-  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'));
 
   // Fetch and Prepare Michelson Code
   useEffect(() => {
@@ -211,7 +228,7 @@ const GenerateContract = () => {
         } else if (value.length > 200) {
           errors.creators = 'Creator(s) cannot exceed 200 characters.';
         } else {
-          const creatorsArray = value.split(',').map((a) => a.trim()).filter((a) => a !== '');
+          const creatorsArray = value.split(',').map((c) => c.trim());
           const uniqueCreators = new Set(creatorsArray);
           if (uniqueCreators.size !== creatorsArray.length) {
             errors.creators = 'Duplicate creators detected.';
@@ -391,24 +408,21 @@ const GenerateContract = () => {
     }
 
     if (!walletAddress) {
-      setSnackbar({ open: true, message: 'Wallet address is undefined. Please reconnect your wallet.', severity: 'error' });
+      setSnackbar({
+        open: true,
+        message: 'Wallet address is undefined. Please reconnect your wallet.',
+        severity: 'error',
+      });
       return;
     }
-
     if (!modifiedMichelsonCode) {
       setSnackbar({ open: true, message: 'Please generate the contract first.', severity: 'warning' });
       return;
     }
 
-    // Open Confirmation Dialog
-    setConfirmDialog({ open: true, data: null });
-  };
-
-  // Confirm Deployment
-  const confirmDeployment = async () => {
-    setConfirmDialog({ open: false, data: null });
+    // Perform fee estimation before opening the confirmation dialog
     setDeploying(true);
-    setSnackbar({ open: true, message: 'Deploying contract...', severity: 'info' });
+    setSnackbar({ open: true, message: 'Checking balance and estimating fees...', severity: 'info' });
 
     try {
       // Define the metadata object
@@ -417,10 +431,7 @@ const GenerateContract = () => {
         description: formData.description,
         interfaces: ['TZIP-012', 'TZIP-016'],
         authors: formData.authors.split(',').map((author) => author.trim()).filter((a) => a !== ''),
-        authoraddress: formData.authorAddresses
-          .split(',')
-          .map((addr) => addr.trim())
-          .filter((a) => a !== ''),
+        authoraddress: formData.authorAddresses.split(',').map((addr) => addr.trim()).filter((a) => a !== ''),
         symbol: formData.symbol,
         creators: formData.creators.split(',').map((creator) => creator.trim()).filter((a) => a !== ''),
         type: formData.type,
@@ -428,7 +439,7 @@ const GenerateContract = () => {
       };
 
       const jsonString = JSON.stringify(metadataObj);
-      const metadataHex = Buffer.from(jsonString).toString('hex');
+      const metadataHex = stringToHex(jsonString);
 
       const metadataMap = new MichelsonMap();
       metadataMap.set('', TEZOS_STORAGE_CONTENT_HEX);
@@ -465,6 +476,129 @@ const GenerateContract = () => {
         };
       }
 
+      // Fetch user's balance
+      const balanceMutez = await tezos.tz.getBalance(walletAddress);
+      const balanceTez = new BigNumber(balanceMutez.toNumber()).dividedBy(1e6);
+
+      // Estimate origination operation
+      const originationEstimation = await tezos.estimate.originate({
+        code: modifiedMichelsonCode,
+        storage: storage,
+      });
+
+      const estimatedFeeMutez = originationEstimation.suggestedFeeMutez;
+      const estimatedGasLimit = originationEstimation.gasLimit;
+      const estimatedStorageLimit = originationEstimation.storageLimit;
+
+      const estimatedFeeTezLocal = new BigNumber(estimatedFeeMutez).dividedBy(1e6).toFixed(6);
+      setEstimatedFeeTez(estimatedFeeTezLocal);
+      setEstimatedGasLimit(estimatedGasLimit);
+      setEstimatedStorageLimit(estimatedStorageLimit);
+
+      // Calculate Storage Cost
+      const storageCostTez = new BigNumber(estimatedStorageLimit).multipliedBy(STORAGE_COST_PER_BYTE).toFixed(6);
+
+      // Calculate Total Estimated Cost
+      const totalEstimatedCostTez = new BigNumber(estimatedFeeTezLocal).plus(storageCostTez).toFixed(6);
+
+      // Calculate Estimated Balance Change (Total Cost)
+      const estimatedBalanceChange = new BigNumber(totalEstimatedCostTez).negated().toFixed(6); // Negative value
+
+      setEstimatedBalanceChangeTez(estimatedBalanceChange);
+
+      // Check if the balance is sufficient
+      if (balanceTez.isLessThan(totalEstimatedCostTez)) {
+        setSnackbar({
+          open: true,
+          message: `Insufficient balance. You need at least ${totalEstimatedCostTez} ꜩ to deploy this contract.`,
+          severity: 'error',
+        });
+        setDeploying(false);
+        return;
+      }
+
+      // Open Confirmation Dialog with estimation data
+      setConfirmDialog({
+        open: true,
+        data: {
+          estimatedFeeTez: estimatedFeeTezLocal,
+          estimatedGasLimit: estimatedGasLimit,
+          estimatedStorageLimit: estimatedStorageLimit,
+          storageCostTez: storageCostTez, // New field
+          estimatedBalanceChangeTez: estimatedBalanceChange,
+        },
+      });
+    } catch (error) {
+      console.error('Error during fee estimation:', error);
+
+      setSnackbar({
+        open: true,
+        message: 'Error estimating fees. Please try again.',
+        severity: 'error',
+      });
+      setDeploying(false);
+    }
+  };
+
+  // Confirm Deployment with Balance Check
+  const confirmDeployment = async () => {
+    setConfirmDialog({ open: false, data: null });
+    setDeploying(true);
+    setSnackbar({ open: true, message: 'Deploying contract...', severity: 'info' });
+
+    try {
+      // Define the metadata object
+      const metadataObj = {
+        name: formData.name,
+        description: formData.description,
+        interfaces: ['TZIP-012', 'TZIP-016'],
+        authors: formData.authors.split(',').map((author) => author.trim()).filter((a) => a !== ''),
+        authoraddress: formData.authorAddresses.split(',').map((addr) => addr.trim()).filter((a) => a !== ''),
+        symbol: formData.symbol,
+        creators: formData.creators.split(',').map((creator) => creator.trim()).filter((a) => a !== ''),
+        type: formData.type,
+        imageUri: formData.imageUri,
+      };
+
+      const jsonString = JSON.stringify(metadataObj);
+      const metadataHex = stringToHex(jsonString);
+
+      const metadataMap = new MichelsonMap();
+      metadataMap.set('', TEZOS_STORAGE_CONTENT_HEX);
+      metadataMap.set(CONTENT_KEY, metadataHex);
+
+      const ledgerMap = new MichelsonMap();
+      const operatorsMap = new MichelsonMap();
+      const tokenMetadataMap = new MichelsonMap();
+
+      let storage;
+
+      if (formData.contractVersion === 'v1') {
+        storage = {
+          admin: walletAddress,
+          ledger: ledgerMap,
+          metadata: metadataMap,
+          next_token_id: 0,
+          operators: operatorsMap,
+          token_metadata: tokenMetadataMap,
+        };
+      } else if (formData.contractVersion === 'v2') {
+        storage = {
+          admin: walletAddress, // address
+          all_tokens: 0, // nat
+          children: [], // set(address)
+          ledger: ledgerMap, // big_map
+          metadata: metadataMap, // big_map
+          next_token_id: 0, // nat
+          operators: operatorsMap, // big_map
+          parents: [], // set(address)
+          paused: false, // bool
+          token_metadata: tokenMetadataMap, // big_map
+          total_supply: new MichelsonMap(), // big_map(nat, nat)
+        };
+      }
+
+      // Proceed with origination
       const originationOp = await tezos.wallet
         .originate({
           code: modifiedMichelsonCode,
@@ -486,7 +620,7 @@ const GenerateContract = () => {
           message: `Contract deployed at ${contractAddr}`,
           severity: 'success',
         });
-        setContractDialogOpen(true); // Open the contract dialog
+        setContractDialogOpen(true);
 
         // Store the deployed contract in localStorage for management
         const storedContracts = JSON.parse(localStorage.getItem('deployedContracts')) || [];
@@ -501,12 +635,28 @@ const GenerateContract = () => {
       }
     } catch (error) {
       console.error('Error deploying contract:', error);
+
       if (error.name === 'AbortedBeaconError') {
         setSnackbar({
           open: true,
           message: 'Deployment aborted by the user.',
           severity: 'warning',
         });
+      } else if (error?.data?.[0]?.with?.string) {
+        const errorMessage = error.data[0].with.string;
+        if (errorMessage.includes('balance_too_low')) {
+          setSnackbar({
+            open: true,
+            message: 'Insufficient balance to cover fees and storage costs.',
+            severity: 'error',
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: `Deployment error: ${errorMessage}`,
+            severity: 'error',
+          });
+        }
       } else if (error.message) {
         setSnackbar({
           open: true,
@@ -522,6 +672,10 @@ const GenerateContract = () => {
       }
     } finally {
       setDeploying(false);
+      setEstimatedFeeTez(null);
+      setEstimatedGasLimit(null);
+      setEstimatedStorageLimit(null);
+      setEstimatedBalanceChangeTez(null); // Reset balance change
     }
   };
 
@@ -573,15 +727,14 @@ const GenerateContract = () => {
 
   return (
     <Container elevation={3}>
-      <Typography variant="h4" gutterBottom align="center" sx={{ fontSize: { xs: '1.5rem', md: '2.5rem' } }}>
+      <Typography variant="h4" gutterBottom align="center">
         Deploy Your On-Chain Tezos NFT Smart Contract
       </Typography>
-      <Typography variant="h5" gutterBottom align="center" sx={{ fontSize: { xs: '1.25rem', md: '1.75rem' } }}>
+      <Typography variant="h5" gutterBottom align="center">
         NFT Collection Contract
       </Typography>
-      <Typography variant="body1" gutterBottom align="center" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
-        Ready to mint your NFTs fully on-chain? Just fill in the details below, and we’ll handle the metadata magic,
-        swapping in your info and wallet address before deploying it on Tezos with Taquito. Big thanks to{' '}
+      <Typography variant="body1" gutterBottom align="center">
+        Ready to mint your NFTs fully on-chain? Just fill in the details below, and we’ll handle the metadata magic, swapping in your info and wallet address before deploying it on Tezos with Taquito. Big thanks to{' '}
         <Link
           href="https://x.com/JestemZero"
           target="_blank"
@@ -870,9 +1023,9 @@ const GenerateContract = () => {
             )}
 
             {/* Buttons */}
-            <Grid item xs={12} sx={{ textAlign: 'center', marginTop: '20px' }}>
+            <Grid item xs={12} style={{ textAlign: 'center', marginTop: '20px' }}>
               {/* "Copy Contract" Button */}
-              <Box sx={{ mb: 2 }}>
+              <div style={{ marginBottom: '10px' }}>
                 <Typography variant="caption" display="block" gutterBottom>
                   for advanced users
                 </Typography>
@@ -881,18 +1034,18 @@ const GenerateContract = () => {
                   color="primary"
                   onClick={handleCopyContract}
                   disabled={!modifiedMichelsonCode}
+                  fullWidth={window.innerWidth < 600} // Responsive fullWidth
                   sx={{
-                    px: { xs: 2, md: 4 },
-                    py: { xs: 1, md: 2 },
-                    fontSize: { xs: '0.8rem', md: '1rem' },
+                    maxWidth: '300px',
+                    margin: '0 auto',
                   }}
                 >
                   Copy Contract
                 </Button>
-              </Box>
+              </div>
 
               {/* "Deploy Contract" Button */}
-              <Box>
+              <div>
                 <Typography variant="caption" display="block" gutterBottom>
                   Get your collection on-chain so you can start minting!
                 </Typography>
@@ -902,15 +1055,21 @@ const GenerateContract = () => {
                   onClick={handleDeployContract}
                   disabled={deploying || !modifiedMichelsonCode || Object.keys(formErrors).length > 0}
                   startIcon={deploying && <CircularProgress size={20} />}
+                  fullWidth={window.innerWidth < 600} // Responsive fullWidth
                   sx={{
-                    px: { xs: 3, md: 6 },
-                    py: { xs: 1, md: 2 },
-                    fontSize: { xs: '0.8rem', md: '1rem' },
+                    maxWidth: '300px',
+                    margin: '0 auto',
                   }}
                 >
                   {deploying ? 'Deploying...' : 'Deploy Contract'}
                 </Button>
-              </Box>
+                {/* Display Estimated Fees */}
+                {estimatedFeeTez && (
+                  <Typography variant="body2" color="textSecondary" style={{ marginTop: '10px' }}>
+                    Estimated Fees: {estimatedFeeTez} ꜩ
+                  </Typography>
+                )}
+              </div>
             </Grid>
           </Grid>
         </form>
@@ -919,10 +1078,10 @@ const GenerateContract = () => {
       {/* Step 2: Display Contract Address */}
       {contractAddress && (
         <Section>
-          <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1.1rem', md: '1.3rem' } }}>
+          <Typography variant="h6" gutterBottom>
             Step 2: Your Contract is Deployed
           </Typography>
-          <Typography variant="body2" gutterBottom sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
+          <Typography variant="body2" gutterBottom>
             Your contract has been successfully deployed. Below is your contract address. You can use this address to mint NFTs.
           </Typography>
           <Preformatted>{contractAddress}</Preformatted>
@@ -930,16 +1089,16 @@ const GenerateContract = () => {
             variant="contained"
             color="secondary"
             onClick={() => navigator.clipboard.writeText(contractAddress)}
+            style={{ marginTop: '10px' }}
+            fullWidth
             sx={{
-              mt: 2,
-              px: { xs: 3, md: 6 },
-              py: { xs: 1, md: 2 },
-              fontSize: { xs: '0.8rem', md: '1rem' },
+              maxWidth: '300px',
+              margin: '10px auto 0',
             }}
           >
             Copy Contract Address
           </Button>
-          <Typography variant="body2" sx={{ mt: 2, fontSize: { xs: '0.9rem', md: '1rem' } }}>
+          <Typography variant="body2" style={{ marginTop: '10px' }}>
             Please check your contract on{' '}
             <Link
               href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
@@ -958,7 +1117,7 @@ const GenerateContract = () => {
               color="primary"
               underline="hover"
             >
-              OBJKT.com
+              ghostnet.OBJKT.com
             </Link>{' '}
             to verify your contract.
           </Typography>
@@ -977,11 +1136,12 @@ const GenerateContract = () => {
         }}
         aria-labelledby="contract-dialog-title"
         aria-describedby="contract-dialog-description"
-        fullScreen={fullScreen}
+        fullWidth
+        maxWidth="sm" // Limit dialog width
       >
         <DialogTitle id="contract-dialog-title">Your Contract Address</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" gutterBottom sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }}>
+          <Typography variant="body1" gutterBottom>
             Your contract has been successfully deployed. Please copy and save your contract address.
           </Typography>
           <Preformatted>{contractAddress}</Preformatted>
@@ -989,17 +1149,12 @@ const GenerateContract = () => {
             variant="contained"
             color="primary"
             onClick={() => navigator.clipboard.writeText(contractAddress)}
-            sx={{
-              mt: 2,
-              px: { xs: 3, md: 6 },
-              py: { xs: 1, md: 2 },
-              fontSize: { xs: '0.8rem', md: '1rem' },
-            }}
-            fullWidth={fullScreen}
+            style={{ marginTop: '10px' }}
+            fullWidth
           >
             Copy Contract Address
           </Button>
-          <Typography variant="body2" sx={{ mt: 2, fontSize: { xs: '0.9rem', md: '1rem' } }}>
+          <Typography variant="body2" style={{ marginTop: '10px' }}>
             You can also view your contract on{' '}
             <Link
               href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
@@ -1014,13 +1169,13 @@ const GenerateContract = () => {
               target="_blank"
               rel="noopener noreferrer"
             >
-              OBJKT.com
+              ghostnet.OBJKT.com
             </Link>
             .
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseContractDialog} color="primary" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
+          <Button onClick={handleCloseContractDialog} color="primary">
             I have saved it
           </Button>
         </DialogActions>
@@ -1032,23 +1187,48 @@ const GenerateContract = () => {
         onClose={handleCloseDialog}
         aria-labelledby="confirm-deployment-title"
         aria-describedby="confirm-deployment-description"
-        fullScreen={fullScreen}
+        fullWidth
+        maxWidth="sm"
       >
         <DialogTitle id="confirm-deployment-title">Confirm Deployment</DialogTitle>
         <DialogContent>
           <DialogContentText id="confirm-deployment-description">
-            Are you sure you want to deploy this smart contract? This action is irreversible, and the contract
-            cannot be deleted once deployed on the Tezos mainnet.
+            Are you sure you want to deploy this smart contract? This action is irreversible, and the contract cannot be deleted once deployed on the Tezos mainnet.
+            <br /><br />
+            <strong>Estimated Deployment Cost (Fee):</strong> {confirmDialog.data ? `${confirmDialog.data.estimatedFeeTez} ꜩ` : 'Calculating...'}{' '}
+            <Tooltip title="The network fee required to deploy your smart contract on the Tezos blockchain." arrow>
+              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+            </Tooltip>
+            <br />
+            <strong>Gas Limit:</strong> {confirmDialog.data ? confirmDialog.data.estimatedGasLimit : 'Calculating...'}{' '}
+            <Tooltip title="The maximum amount of computational work allowed for the deployment operation." arrow>
+              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+            </Tooltip>
+            <br />
+            <strong>Storage Limit:</strong> {confirmDialog.data ? confirmDialog.data.estimatedStorageLimit : 'Calculating...'}{' '}
+            <Tooltip title="The maximum amount of storage allocated for your contract's data on the blockchain." arrow>
+              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+            </Tooltip>
+            <br />
+            <strong>Estimated Storage Cost:</strong> {confirmDialog.data ? `${confirmDialog.data.storageCostTez} ꜩ` : 'Calculating...'}{' '}
+            <Tooltip title="The cost associated with storing your contract's data on the Tezos blockchain." arrow>
+              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+            </Tooltip>
+            <br />
+            <strong>Estimated Balance Change:</strong> {confirmDialog.data ? `${confirmDialog.data.estimatedBalanceChangeTez} ꜩ` : 'Calculating...'}{' '}
+            <Tooltip title="The total estimated change in your account balance after deploying the contract (fee + storage cost)." arrow>
+              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+            </Tooltip>
           </DialogContentText>
-          <Typography variant="subtitle2" color="error" sx={{ mt: 2, fontSize: { xs: '0.8rem', md: '1rem' } }}>
+          <Typography variant="subtitle2" color="error" style={{ marginTop: '10px' }}>
             **Please ensure all the information is correct before proceeding.**
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} color="primary" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
+          <Button onClick={handleCloseDialog} color="primary">
             Cancel
           </Button>
-          <Button onClick={confirmDeployment} color="primary" autoFocus sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
+          <Button onClick={confirmDeployment} color="primary" variant="contained" autoFocus>
             Confirm Deployment
           </Button>
         </DialogActions>
