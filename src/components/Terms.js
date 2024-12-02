@@ -41,8 +41,8 @@ const Terms = () => {
               >
                 Ghostnet
               </Link>{' '}
-              before deploying to mainnet, as all actions are final and permanent.  If you make a mistake you can hide the collection from your main objkt portfolio or burn any erroneous tokens. ⚠️ OBJKT might not display
-              Collection Thumbnails over 254 Characters, so make em' teeny tiny!
+              before deploying to mainnet, as all actions are final and permanent. If you make a mistake, you can hide the collection from your main objkt portfolio or burn any erroneous tokens. ⚠️ OBJKT might not display
+              Collection Thumbnails over 254 Characters, so make 'em teeny tiny!
             </Typography>
           </Alert>
         </Section>
@@ -119,27 +119,19 @@ const Terms = () => {
           If you have any questions about these Terms and Conditions, please contact us at <a href="mailto:support@savetheworldwithart.io">support@savetheworldwithart.io</a>.
         </Typography>
 
-        {/* New Section: Understanding #ZeroContracts */}
+        {/* Updated Section: Understanding #ZeroContracts */}
         <Typography variant="h6" gutterBottom>
           10. How #ZeroContracts Work
         </Typography>
         <Typography variant="body2" paragraph>
-          At SaveTheWorldWithArt.io, we offer two versions of our smart contracts, known as <strong>#ZeroContracts</strong>, designed to simplify the process of creating and managing your NFT collections on the Tezos blockchain. Here's how each version works:
-        </Typography>
-
-        {/* ZeroContract Version 1 */}
-        <Typography variant="subtitle1" gutterBottom>
-          ZeroContract Version 1
-        </Typography>
-        <Typography variant="body2" paragraph>
-          **Version 1** is tailored for artists who want to create a limited edition of 1/1 NFTs. This means each NFT is unique and cannot be replicated. The primary entrypoints (functions) available in this contract are:
+          At SaveTheWorldWithArt.io, we offer two versions of our smart contracts, known as <strong>#ZeroContracts</strong>, designed to simplify the process of creating and managing your NFT collections on the Tezos blockchain. Both versions share the following key entrypoints:
         </Typography>
         <ul>
           <li>
-            <strong>mint:</strong> Allows you to create a new NFT by providing its metadata and specifying the recipient's address.
+            <strong>mint:</strong> Allows you to create new NFTs by providing their metadata and specifying the recipient's address. In Version 2, this entrypoint supports minting multiple editions of an NFT.
           </li>
           <li>
-            <strong>burn:</strong> Enables you to permanently remove an NFT from circulation by specifying its unique identifier.
+            <strong>burn:</strong> Enables you to permanently remove NFTs from circulation by specifying their unique identifiers.
           </li>
           <li>
             <strong>balance_of:</strong> Lets you check the ownership balance by querying the contract with specific requests and receiving callbacks with the relevant information.
@@ -150,55 +142,40 @@ const Terms = () => {
           <li>
             <strong>update_operators:</strong> Allows you to manage permissions by adding or removing operators who can handle your NFTs on your behalf.
           </li>
+          <li>
+            <strong>add_parent / add_child:</strong> Manage hierarchical relationships between contracts, allowing for complex NFT structures.
+          </li>
+          <li>
+            <strong>remove_parent / remove_child:</strong> Remove existing hierarchical relationships between contracts.
+          </li>
         </ul>
 
-        {/* ZeroContract Version 2 */}
-        <Typography variant="subtitle1" gutterBottom>
-          ZeroContract Version 2
+        <Typography variant="body2" paragraph>
+          <strong>Version 1</strong> is tailored for artists who want to create unique, single-edition NFTs. Each NFT is one-of-a-kind and cannot be replicated.
         </Typography>
         <Typography variant="body2" paragraph>
-          **Version 2** is designed for artists who wish to mint multiple editions of their NFTs, offering greater flexibility. The entrypoints in this version include all those in Version 1, with additional functionalities to support multiple editions:
+          <strong>Version 2</strong> is designed for artists who wish to mint multiple editions of their NFTs, offering greater flexibility. This version allows you to mint several copies of an NFT in a single transaction, making it ideal for limited series or collectible works.
         </Typography>
-        <ul>
-          <li>
-            <strong>add_child / add_parent:</strong> Manage hierarchical relationships between contracts, allowing for complex NFT structures.
-          </li>
-          <li>
-            <strong>balance_of:</strong> Similar to Version 1, it provides ownership balance information based on specific requests.
-          </li>
-          <li>
-            <strong>burn:</strong> Permanently removes a specified quantity of NFTs based on their unique identifiers.
-          </li>
-          <li>
-            <strong>mint:</strong> Creates new NFTs with provided metadata and assigns them to a specified address, supporting multiple editions.
-          </li>
-          <li>
-            <strong>transfer:</strong> Enables the transfer of multiple NFTs between addresses, ensuring efficient ownership management.
-          </li>
-          <li>
-            <strong>update_operators:</strong> Allows for the addition or removal of operators who can manage NFTs on your behalf.
-          </li>
-        </ul>
 
         {/* Explanation of Metadata and On-Chain NFTs */}
         <Typography variant="body2" paragraph>
-          **Metadata Storage:**  
+          <strong>Metadata Storage:</strong><br />
           All the information about your NFTs, such as their names, descriptions, creators, and images, is stored directly on the Tezos blockchain. This ensures that your NFTs are fully on-chain, making them immutable and secure.
         </Typography>
         <Typography variant="body2" paragraph>
-          **On-Chain NFTs:**  
+          <strong>On-Chain NFTs:</strong><br />
           By deploying your NFTs on-chain, you ensure that they exist permanently and transparently on the blockchain. This provides a trustworthy record of ownership and provenance, enhancing the value and authenticity of your artwork.
         </Typography>
         <Typography variant="body2" paragraph>
-          **Collection Thumbnails:**  
+          <strong>Collection Thumbnails:</strong><br />
           The thumbnail images representing your NFT collection are also stored on-chain as part of the metadata. To ensure optimal performance and compatibility with platforms like OBJKT.com, thumbnails are compressed and kept under 20KB in size.
         </Typography>
         <Typography variant="body2" paragraph>
-          **Automated, No-Code Deployment:**  
+          <strong>Automated, No-Code Deployment:</strong><br />
           Our platform automates the complex process of deploying smart contracts and minting NFTs, providing a user-friendly, no-code experience. This empowers artists to effortlessly bring their creations to the blockchain without requiring technical expertise.
         </Typography>
         <Typography variant="body2" paragraph>
-          **Join the World of Compressionism and Pixel Art:**  
+          <strong>Join the World of Compressionism and Pixel Art:</strong><br />
           Dive into a fascinating world where art meets blockchain technology. Our platform supports various art forms, including compressionism and pixel art, allowing you to showcase your unique style on the Tezos network.
         </Typography>
 

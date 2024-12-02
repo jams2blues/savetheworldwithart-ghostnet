@@ -218,6 +218,9 @@ const MintBurnTransfer = () => {
                         height: 'auto',
                         maxHeight: { xs: '150px', md: '200px' },
                         mt: 1,
+                        objectFit: 'contain', // Prevent image distortion
+                        backgroundColor: '#f5f5f5', // Optional: for images with transparency
+                        borderRadius: '8px', // Optional: add rounded corners
                       }}
                     />
                   )}
