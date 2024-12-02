@@ -16,21 +16,19 @@ import {
   InputLabel,
   FormControl,
   IconButton,
-  Snackbar,
-  Alert,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogContentText,
   DialogActions,
-  Tooltip, // Import Tooltip
+  Tooltip,
 } from '@mui/material';
 import { MichelsonMap } from '@taquito/taquito';
 import MintUpload from './MintUpload';
 import { Buffer } from 'buffer';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
-import InfoIcon from '@mui/icons-material/Info'; // Import InfoIcon
+import InfoIcon from '@mui/icons-material/Info';
 import { BigNumber } from 'bignumber.js';
 
 // Styled Components
@@ -53,7 +51,23 @@ const isValidTezosAddress = (address) => {
   return tezosAddressRegex.test(address);
 };
 
-const Mint = ({ contractAddress, tezos, contractVersion }) => {
+// Helper function to recursively find a field in storage
+const findFieldInStorage = (storage, fieldName) => {
+  if (storage[fieldName] !== undefined) {
+    return storage[fieldName];
+  }
+  for (const key in storage) {
+    if (typeof storage[key] === 'object' && storage[key] !== null) {
+      const result = findFieldInStorage(storage[key], fieldName);
+      if (result !== undefined) {
+        return result;
+      }
+    }
+  }
+  return undefined;
+};
+
+const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   // State variables for form data
   const [formData, setFormData] = useState({
     name: '',
@@ -89,13 +103,6 @@ const Mint = ({ contractAddress, tezos, contractVersion }) => {
     totalEstimatedCostTez: null, // Added for total cost
   });
 
-  // Snackbar state
-  const [snackbar, setSnackbar] = useState({
-    open: false,
-    message: '',
-    severity: 'info', // 'error', 'warning', 'info', 'success'
-  });
-
   // Confirmation Dialog state
   const [confirmDialog, setConfirmDialog] = useState({
     open: false,
@@ -108,8 +115,8 @@ const Mint = ({ contractAddress, tezos, contractVersion }) => {
 
   // Handle input changes
   const handleInputChange = (e) => {
-    const { name, value, checked, type } = e.target;
-    let newValue = type === 'checkbox' ? checked : value;
+    const { name, value } = e.target;
+    let newValue = value;
 
     // If the field is 'amount', enforce the maximum and minimum limits
     if (name === 'amount') {
@@ -218,20 +225,26 @@ const Mint = ({ contractAddress, tezos, contractVersion }) => {
     try {
       const contract = await tezos.wallet.at(contractAddress);
       const storage = await contract.storage();
+      console.log('Contract Storage:', storage);
 
       if (contractVersion === 'v1') {
         // For v1, each contract handles a single edition
         return 1;
       } else if (contractVersion === 'v2') {
-        // For v2, fetch 'next_token_id' from storage
-        // Adjust based on actual storage structure
-        const nextTokenId = storage.next_token_id.toNumber();
-        const currentMinted = nextTokenId - 1; // Adjusting for 1-based indexing
-        return currentMinted;
+        // For v2, fetch 'next_token_id' from storage using the helper
+        const nextTokenId = findFieldInStorage(storage, 'next_token_id');
+        if (nextTokenId) {
+          const nextTokenIdNumber = nextTokenId.toNumber();
+          const currentMinted = nextTokenIdNumber - 1; // Adjusting for 1-based indexing
+          return currentMinted;
+        } else {
+          throw new Error('next_token_id not found in storage.');
+        }
       } else {
         throw new Error('Unsupported contract version.');
       }
     } catch (error) {
+      console.error('getCurrentMintedEditions Error:', error);
       throw new Error('Failed to fetch contract storage.');
     }
   };
@@ -1087,23 +1100,10 @@ const Mint = ({ contractAddress, tezos, contractVersion }) => {
           </Button>
         </DialogActions>
       </Dialog>
-      {/* Snackbar for Notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setSnackbar({ ...snackbar, open: false })}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* Removed Local Snackbar */}
     </div>
   );
+
 };
 
 export default Mint;

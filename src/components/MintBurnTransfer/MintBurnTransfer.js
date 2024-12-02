@@ -1,4 +1,4 @@
-// src/components/MintBurnTransfer/MintBurnTransfer.js
+// frontend/src/components/MintBurnTransfer/MintBurnTransfer.js
 
 import React, { useState, useContext } from 'react';
 import styled from 'styled-components';
@@ -12,7 +12,7 @@ import {
   CircularProgress,
   Grid,
   Box,
-  Stack, // Import Stack
+  Stack,
 } from '@mui/material';
 import { WalletContext } from '../../contexts/WalletContext';
 import Mint from './Mint';
@@ -20,6 +20,7 @@ import Burn from './Burn';
 import Transfer from './Transfer';
 import BalanceOf from './BalanceOf';
 import UpdateOperators from './UpdateOperators';
+import AddRemoveParentChild from './AddRemoveParentChild';
 
 // Styled Components
 const StyledPaper = styled(Paper)`
@@ -49,7 +50,6 @@ const Disclaimer = styled.div`
 `;
 
 const MintBurnTransfer = () => {
-  // Corrected destructuring: use 'tezos' instead of 'Tezos'
   const { tezos, isWalletConnected } = useContext(WalletContext);
   const [contractAddress, setContractAddress] = useState('');
   const [contractMetadata, setContractMetadata] = useState(null);
@@ -58,26 +58,14 @@ const MintBurnTransfer = () => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [contractVersion, setContractVersion] = useState('');
 
-  // Function to detect contract version based on entrypoints
-  const detectContractVersion = (entrypoints) => {
-    const v2UniqueEntrypoints = [
-      'add_child',
-      'add_parent',
-      'remove_child',
-      'remove_parent',
-    ];
-    
-    // Extract all entrypoint names and convert to lowercase for case-insensitive comparison
-    const entrypointNames = Object.keys(entrypoints).map(ep => ep.toLowerCase());
-    console.log('Entrypoint Names:', entrypointNames);
-    
-    // Identify which unique v2 entrypoints are present
-    const v2EntrypointsPresent = v2UniqueEntrypoints.filter(ep => entrypointNames.includes(ep));
-    
-    console.log(`v2 unique entrypoints present: ${v2EntrypointsPresent.join(', ')}`);
-    
-    // Determine contract version based on the presence of unique v2 entrypoints
-    return v2EntrypointsPresent.length >= 2 ? 'v2' : 'v1';
+  // Function to detect contract version based on storage fields
+  const detectContractVersion = (storage) => {
+    // v2 has 'all_tokens' and 'total_supply' fields
+    if (storage.hasOwnProperty('all_tokens') && storage.hasOwnProperty('total_supply')) {
+      return 'v2';
+    }
+    // Default to v1
+    return 'v1';
   };
 
   // Function to fetch contract metadata and detect version
@@ -88,22 +76,15 @@ const MintBurnTransfer = () => {
     }
     setLoading(true);
     try {
-      // Use 'tezos' instead of 'Tezos'
       const contract = await tezos.contract.at(contractAddress);
-      const entrypointsWrapper = contract.entrypoints; // Access as a property
-      console.log('Entrypoints Wrapper:', entrypointsWrapper);
+      const storage = await contract.storage();
 
-      // Correctly access the nested entrypoints object
-      const entrypoints = entrypointsWrapper.entrypoints;
-      console.log('Entrypoints:', entrypoints);
-
-      // Detect contract version based on entrypoints
-      const detectedVersion = detectContractVersion(entrypoints);
+      // Detect contract version based on storage fields
+      const detectedVersion = detectContractVersion(storage);
       setContractVersion(detectedVersion);
       console.log(`Detected contract version: ${detectedVersion}`);
 
       // Access the metadata big map
-      const storage = await contract.storage();
       const metadataMap = storage.metadata;
 
       // Retrieve the metadata URI from the big map using the empty string key ''
@@ -159,7 +140,6 @@ const MintBurnTransfer = () => {
 
       setSnackbar({ open: true, message: `Contract metadata loaded (Version: ${detectedVersion}).`, severity: 'success' });
     } catch (error) {
-      // Removed console.error for production
       setSnackbar({ open: true, message: error.message, severity: 'error' });
       setContractVersion('');
       setContractMetadata(null);
@@ -350,7 +330,7 @@ const MintBurnTransfer = () => {
                       </Button>
                     </Stack>
                     <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
-                      Check the balance of NFTs for a specific owner and token ID.
+                      Check the balance of NFTs for a specific owner.
                     </Typography>
 
                     {/* Update Operators Button and Description */}
@@ -375,6 +355,74 @@ const MintBurnTransfer = () => {
                     <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       Add or remove operators who can manage your NFTs on your behalf.
                     </Typography>
+
+                    {/* Add/Remove Parent Buttons */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
+                    >
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={() => handleActionClick('add_parent')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Add Parent
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="secondary"
+                        onClick={() => handleActionClick('remove_parent')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Remove Parent
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
+                      Manage parent relationships for your NFTs.
+                    </Typography>
+
+                    {/* Add/Remove Child Buttons */}
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ width: '100%', maxWidth: '300px' }}
+                    >
+                      <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={() => handleActionClick('add_child')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Add Child
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="secondary"
+                        onClick={() => handleActionClick('remove_child')}
+                        fullWidth
+                        sx={{
+                          fontSize: { xs: '0.875rem', md: '1rem' },
+                        }}
+                      >
+                        Remove Child
+                      </Button>
+                    </Stack>
+                    <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
+                      Manage child relationships for your NFTs.
+                    </Typography>
                   </Stack>
                 </Grid>
               </Grid>
@@ -382,7 +430,7 @@ const MintBurnTransfer = () => {
               {action === 'mint' && (
                 <Mint
                   contractAddress={contractAddress}
-                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -390,7 +438,7 @@ const MintBurnTransfer = () => {
               {action === 'burn' && (
                 <Burn
                   contractAddress={contractAddress}
-                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -398,7 +446,7 @@ const MintBurnTransfer = () => {
               {action === 'transfer' && (
                 <Transfer
                   contractAddress={contractAddress}
-                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -406,7 +454,7 @@ const MintBurnTransfer = () => {
               {action === 'balance_of' && (
                 <BalanceOf
                   contractAddress={contractAddress}
-                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
                 />
@@ -414,9 +462,18 @@ const MintBurnTransfer = () => {
               {action === 'update_operators' && (
                 <UpdateOperators
                   contractAddress={contractAddress}
-                  tezos={tezos} // Pass 'tezos' instead of 'Tezos'
+                  tezos={tezos}
                   setSnackbar={setSnackbar}
                   contractVersion={contractVersion}
+                />
+              )}
+              {(action === 'add_parent' || action === 'remove_parent' || action === 'add_child' || action === 'remove_child') && (
+                <AddRemoveParentChild
+                  contractAddress={contractAddress}
+                  tezos={tezos}
+                  setSnackbar={setSnackbar}
+                  contractVersion={contractVersion}
+                  actionType={action} // Pass the specific action type
                 />
               )}
             </>
@@ -429,7 +486,11 @@ const MintBurnTransfer = () => {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>
