@@ -24,13 +24,14 @@ import {
   FormControlLabel,
   Link,
   Tooltip,
+  IconButton,
 } from '@mui/material';
+import InfoIcon from '@mui/icons-material/Info';
 import { WalletContext } from '../contexts/WalletContext';
 import NFTPreview from './NFTPreview';
 import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
-import InfoIcon from '@mui/icons-material/Info';
 
 // Styled Components
 const Container = styled(Paper)`
@@ -144,6 +145,37 @@ const GenerateContract = () => {
 
   // Define the symbol validation regex
   const symbolPattern = /^[A-Za-z0-9]{3,5}$/;
+
+  // Supported Filetypes List
+  const supportedFiletypesList = [
+    'image/bmp',
+    'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/apng',
+    'image/svg+xml',
+    'image/webp',
+    'video/mp4',
+    'video/ogg',
+    'video/quicktime',
+    'video/webm',
+    'model/gltf-binary',
+    'model/gltf+json',
+    'audio/mpeg',
+    'audio/ogg',
+    'audio/wav',
+    'audio/wave',
+    'audio/x-pn-wav',
+    'audio/vnd.wave',
+    'audio/x-wav',
+    'audio/flac',
+    'application/pdf',
+    'application/zip',
+    'application/x-zip-compressed',
+    'multipart/x-zip',
+    'text/plain',
+    'application/json',
+  ];
 
   // Fetch and Prepare Michelson Code
   useEffect(() => {
@@ -1034,17 +1066,32 @@ const GenerateContract = () => {
 
             {/* Upload Collection Thumbnail */}
             <Grid item xs={12}>
-              <FileUpload setArtifactData={handleThumbnailUpload} />
-              {formErrors.imageUri && (
-                <Typography variant="caption" color="error">
-                  {formErrors.imageUri}
-                </Typography>
-              )}
-              {formData.imageUri && !formErrors.imageUri && (
-                <Typography variant="caption" color="textSecondary">
-                  Size: {(getByteSize(formData.imageUri) / 1024).toFixed(2)} KB / 20 KB
-                </Typography>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <FileUpload setArtifactData={handleThumbnailUpload} />
+                <Tooltip
+                  title={
+                    <React.Fragment>
+                      <Typography variant="subtitle2">Supported Filetypes:</Typography>
+                      <Typography variant="body2">
+                        {supportedFiletypesList.join(', ')}
+                      </Typography>
+                    </React.Fragment>
+                  }
+                  arrow
+                >
+                  <IconButton
+                    size="small"
+                    style={{ marginLeft: '8px' }}
+                    aria-label="Supported Filetypes"
+                  >
+                    <InfoIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </div>
+              {/* Display File Constraints */}
+              <Typography variant="caption" color="error" style={{ marginTop: '5px', display: 'block' }}>
+                • Thumbnail must be 1:1 aspect ratio and under 15MB
+              </Typography>
             </Grid>
 
             {/* Agree to Terms and Conditions */}

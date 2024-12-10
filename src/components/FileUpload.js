@@ -5,6 +5,39 @@ import { Button, Snackbar, Alert, Typography } from '@mui/material';
 import { useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
+const ACCEPTED_MIME_TYPES = [
+  'image/bmp',
+  'image/gif',
+  'image/jpeg',
+  'image/png',
+  'image/apng',
+  'image/svg+xml',
+  'image/webp',
+  'video/mp4',
+  'video/ogg',
+  'video/quicktime',
+  'video/webm',
+  'model/gltf-binary',
+  'model/gltf+json',
+  'audio/mpeg',
+  'audio/ogg',
+  'audio/wav',
+  'audio/wave',
+  'audio/x-pn-wav',
+  'audio/vnd.wave',
+  'audio/x-wav',
+  'audio/flac',
+  'application/pdf',
+  'application/zip',
+  'application/x-zip-compressed',
+  'multipart/x-zip',
+  'text/plain',
+  'application/json',
+].join(',');
+
+const RAW_MAX_SIZE = 15 * 1024 * 1024; // 15MB in bytes
+const ENCODED_MAX_SIZE = 20000; // 20KB in bytes
+
 const FileUpload = ({ setArtifactData }) => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [fileName, setFileName] = useState('');
@@ -19,13 +52,11 @@ const FileUpload = ({ setArtifactData }) => {
       setFileName('');
       setArtifactData(null);
 
-      // Define size limits
-      const RAW_MAX_SIZE = 15 * 1024; // 15KB in bytes
-
-      if (file.size > RAW_MAX_SIZE) { // 15KB raw limit
+      // Validate file size
+      if (file.size > RAW_MAX_SIZE) { // 15MB raw limit
         setSnackbar({
           open: true,
-          message: 'File size exceeds 15KB. Please upload a smaller file to stay under 20KB after encoding.',
+          message: 'File size exceeds 15MB. Please upload a smaller file.',
           severity: 'error',
         });
         e.target.value = null; // Reset the input
@@ -33,79 +64,104 @@ const FileUpload = ({ setArtifactData }) => {
       }
 
       // Validate file type
-      const acceptedTypes = [
-        'image/png',
-        'image/jpeg',
-        'image/gif',
-        'image/svg+xml',
-        'video/mp4',
-        'video/mpeg',
-        'text/html',
-      ];
+      const acceptedTypes = ACCEPTED_MIME_TYPES.split(',');
       if (!acceptedTypes.includes(file.type)) {
         setSnackbar({
           open: true,
-          message: 'Unsupported file type. Please upload an image, video, or HTML file.',
+          message: 'Unsupported file type. Please upload a supported file format.',
           severity: 'error',
         });
         e.target.value = null; // Reset the input
         return;
       }
 
-      // Read the file as Data URL
-      setUploading(true);
-      try {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUri = reader.result;
-
-          // Verify that the encoded size does not exceed ~20KB
-          // Base64 increases size by ~33%, but dataUri includes prefix (e.g., data:image/png;base64,)
-          // We'll check the byte length after decoding
-          const byteString = atob(dataUri.split(',')[1]);
-          const byteLength = byteString.length;
-          if (byteLength > 20000) { // 20KB limit
+      // If the file is an image, validate aspect ratio
+      if (file.type.startsWith('image/')) {
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          const { width, height } = img;
+          if (width !== height) {
             setSnackbar({
               open: true,
-              message: 'Encoded file size exceeds 20KB. Please upload a smaller file.',
+              message: 'Image must have a 1:1 aspect ratio.',
               severity: 'error',
             });
             e.target.value = null; // Reset the input
-            setUploading(false);
+            URL.revokeObjectURL(objectUrl);
             return;
           }
-
-          // Pass the Data URL back to parent
-          if (setArtifactData) {
-            setArtifactData(dataUri);
-          }
-          // Update file name to display
-          setFileName(file.name);
-          setSnackbar({
-            open: true,
-            message: 'File uploaded successfully.',
-            severity: 'success',
-          });
+          URL.revokeObjectURL(objectUrl);
+          proceedFileUpload(file, e);
         };
-        reader.onerror = () => {
+        img.onerror = () => {
           setSnackbar({
             open: true,
-            message: 'Error reading file. Please try again.',
+            message: 'Error processing image. Please try a different file.',
             severity: 'error',
           });
           e.target.value = null; // Reset the input
+          URL.revokeObjectURL(objectUrl);
         };
-        reader.readAsDataURL(file);
-      } catch (error) {
+        img.src = objectUrl;
+      } else {
+        // For non-image files, proceed without aspect ratio check
+        proceedFileUpload(file, e);
+      }
+    }
+  };
+
+  const proceedFileUpload = (file, e) => {
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUri = reader.result;
+
+        // Verify that the encoded size does not exceed 20KB
+        const byteString = atob(dataUri.split(',')[1]);
+        const byteLength = byteString.length;
+        if (byteLength > ENCODED_MAX_SIZE) { // 20KB limit
+          setSnackbar({
+            open: true,
+            message: 'Encoded file size exceeds 20KB. Please upload a smaller file.',
+            severity: 'error',
+          });
+          e.target.value = null; // Reset the input
+          setUploading(false);
+          return;
+        }
+
+        // Pass the Data URL back to parent
+        if (setArtifactData) {
+          setArtifactData(dataUri);
+        }
+        // Update file name to display
+        setFileName(file.name);
         setSnackbar({
           open: true,
-          message: 'Unexpected error occurred. Please try again.',
+          message: 'File uploaded successfully.',
+          severity: 'success',
+        });
+      };
+      reader.onerror = () => {
+        setSnackbar({
+          open: true,
+          message: 'Error reading file. Please try again.',
           severity: 'error',
         });
         e.target.value = null; // Reset the input
-      } finally {
-        setUploading(false);
-      }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: 'Unexpected error occurred. Please try again.',
+        severity: 'error',
+      });
+      e.target.value = null; // Reset the input
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -116,7 +172,7 @@ const FileUpload = ({ setArtifactData }) => {
   return (
     <div>
       <input
-        accept="image/*,video/*,text/html"
+        accept={ACCEPTED_MIME_TYPES}
         style={{ display: 'none' }}
         id="collection-thumbnail-upload"
         type="file"
@@ -132,7 +188,7 @@ const FileUpload = ({ setArtifactData }) => {
           disabled={uploading}
           aria-label="Upload Collection Thumbnail"
         >
-          {uploading ? 'Uploading...' : 'Upload Collection Thumbnail, Under 15KB *'}
+          {uploading ? 'Uploading...' : 'Upload Collection Thumbnail'}
         </Button>
       </label>
       {fileName && (
