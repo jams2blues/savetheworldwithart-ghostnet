@@ -42,6 +42,9 @@ const MAX_ATTRIBUTE_NAME_LENGTH = 32;
 const MAX_ATTRIBUTE_VALUE_LENGTH = 32;
 const MAX_EDITIONS = 10000; // Maximum editions cap
 
+// **New Constant for Royalty Limit**
+const MAX_ROYALTIES = 25; // Maximum royalties cap
+
 // Helper function to convert string to hex
 const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
 
@@ -459,10 +462,11 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       return;
     }
 
-    if (royaltiesValue < 0 || royaltiesValue > 10) {
+    // **Updated Royalty Validation**
+    if (royaltiesValue < 0 || royaltiesValue > MAX_ROYALTIES) {
       setSnackbar({
         open: true,
-        message: 'Royalties must be between 0 and 10%.',
+        message: `Royalties must be between 0 and ${MAX_ROYALTIES}%.`,
         severity: 'warning',
       });
       return;
@@ -643,7 +647,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         stringToHex(
           JSON.stringify({
             decimals: 4,
-            shares: { [formData.toAddress]: Math.round(formData.royalties * 100) }, // e.g., 10% -> 1000
+            shares: { [formData.toAddress]: Math.round(formData.royalties * 100) }, // e.g., 25% -> 2500
           })
         )
       );
@@ -818,14 +822,14 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         {/* Royalties */}
         <Grid item xs={12}>
           <TextField
-            label="Royalties (%) * (Maximum 10%)"
+            label={`Royalties (%) * (Maximum ${MAX_ROYALTIES}%)`}
             name="royalties"
             value={formData.royalties}
             onChange={handleInputChange}
             fullWidth
             placeholder="e.g., 10"
             type="number"
-            InputProps={{ inputProps: { min: 0, max: 10, step: 0.01 } }}
+            InputProps={{ inputProps: { min: 0, max: MAX_ROYALTIES, step: 0.01 } }}
           />
         </Grid>
         {/* License */}
@@ -971,7 +975,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           variant="contained"
           color="success"
           onClick={handleMintButtonClick}
-          disabled={loading}
+          disabled={loading || !agreedToTerms} // **Adjusted Disabled State**
           startIcon={loading && <CircularProgress size={20} />}
           aria-label="Mint NFT"
         >
