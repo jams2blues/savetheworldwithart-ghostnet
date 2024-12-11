@@ -1,12 +1,29 @@
 // frontend/src/components/MintBurnTransfer/MintUpload.js
 
 import React, { useState } from 'react';
-import { Button, Snackbar, Alert, Typography } from '@mui/material';
+import { Button, Snackbar, Alert, Typography, Tooltip } from '@mui/material';
 
 const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [fileName, setFileName] = useState('');
   const [uploading, setUploading] = useState(false);
+
+  // List of accepted MIME types
+  const ACCEPTED_TYPES = [
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/svg+xml',
+    'video/mp4',
+    'video/webm',
+    'audio/mpeg',       // MP3
+    'audio/wav',
+    'audio/flac',
+    'model/gltf-binary', // GLB
+    'model/gltf+json',   // GLTF
+    'application/pdf',
+    'application/zip',
+  ];
 
   // Function to calculate byte size
   const getByteSize = (dataUri) => {
@@ -29,9 +46,10 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
       onFileChange(null);
       onFileDataUrlChange(null);
 
-      // Define size limits
+      // Define size limit
       const RAW_MAX_SIZE = 20 * 1024; // 20KB in bytes
 
+      // Validate file size
       if (file.size > RAW_MAX_SIZE) { // 20KB raw limit
         setSnackbar({
           open: true,
@@ -43,11 +61,10 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
       }
 
       // Validate file type
-      const acceptedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/svg+xml'];
-      if (!acceptedTypes.includes(file.type)) {
+      if (!ACCEPTED_TYPES.includes(file.type)) {
         setSnackbar({
           open: true,
-          message: 'Unsupported file type. Please upload an image (PNG, JPEG, GIF, SVG).',
+          message: 'Unsupported file type. Please upload a supported file.',
           severity: 'error',
         });
         e.target.value = null; // Reset the input
@@ -62,11 +79,11 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
           const dataUri = reader.result;
           const byteSize = getByteSize(dataUri);
 
-          // Verify that the encoded size does not exceed ~26.67KB
-          if (byteSize > 27000) { // 26.67KB rounded up
+          // Verify that the encoded size does not exceed 20KB
+          if (byteSize > 20000) { // 20KB
             setSnackbar({
               open: true,
-              message: 'Encoded file size exceeds 27KB. Please upload a smaller file.',
+              message: 'Encoded file size exceeds 20KB. Please upload a smaller file.',
               severity: 'error',
             });
             e.target.value = null; // Reset the input
@@ -116,26 +133,46 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Tooltip content
+  const tooltipTitle = (
+    <div>
+      <Typography variant="subtitle2">Supported File Types:</Typography>
+      <Typography variant="body2">- Images: PNG, JPEG, GIF, SVG</Typography>
+      <Typography variant="body2">- Videos: MP4, WEBM</Typography>
+      <Typography variant="body2">- Audio: MP3, WAV, FLAC</Typography>
+      <Typography variant="body2">- 3D Models: GLB, GLTF</Typography>
+      <Typography variant="body2">- Text: PDF</Typography>
+      <Typography variant="body2">- Interactive: ZIP</Typography>
+      <br />
+      <Typography variant="subtitle2">Maximum File Size:</Typography>
+      <Typography variant="body2">20KB</Typography>
+    </div>
+  );
+
   return (
     <div>
       <input
-        accept="image/png, image/jpeg, image/gif, image/svg+xml"
+        accept={ACCEPTED_TYPES.join(', ')}
         style={{ display: 'none' }}
         id="mint-nft-upload"
         type="file"
         onChange={handleFileChange}
       />
       <label htmlFor="mint-nft-upload">
-        <Button
-          variant="contained"
-          component="span"
-          color="primary"
-          style={{ marginTop: '10px' }}
-          disabled={uploading}
-          aria-label="Upload Your NFT File"
-        >
-          {uploading ? 'Uploading...' : 'Upload Your NFT *'}
-        </Button>
+        <Tooltip title={tooltipTitle} arrow>
+          <span>
+            <Button
+              variant="contained"
+              component="span"
+              color="primary"
+              style={{ marginTop: '10px' }}
+              disabled={uploading}
+              aria-label="Upload Your NFT File"
+            >
+              {uploading ? 'Uploading...' : 'Upload Your NFT *'}
+            </Button>
+          </span>
+        </Tooltip>
       </label>
       {fileName && (
         <Typography variant="body2" style={{ marginTop: '10px' }}>
