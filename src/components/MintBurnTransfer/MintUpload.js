@@ -1,4 +1,4 @@
-// frontend/src/components/MintBurnTransfer/MintUpload.js
+// frontend/src/components/MintBurnTransfer/MintUpload.js (Ghostnet Version)
 
 import React, { useState } from 'react';
 import { Button, Snackbar, Alert, Typography, Tooltip } from '@mui/material';
@@ -8,21 +8,35 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
   const [fileName, setFileName] = useState('');
   const [uploading, setUploading] = useState(false);
 
-  // List of accepted MIME types
+  // Comprehensive list of accepted MIME types
   const ACCEPTED_TYPES = [
-    'image/png',
-    'image/jpeg',
+    'image/bmp',
     'image/gif',
+    'image/jpeg',
+    'image/png',
+    'image/apng',
     'image/svg+xml',
+    'image/webp',
     'video/mp4',
+    'video/ogg',
+    'video/quicktime',
     'video/webm',
-    'audio/mpeg',       // MP3
+    'audio/mpeg',           // MP3
+    'audio/ogg',
     'audio/wav',
+    'audio/wave',
+    'audio/x-pn-wav',
+    'audio/vnd.wave',
+    'audio/x-wav',
     'audio/flac',
-    'model/gltf-binary', // GLB
-    'model/gltf+json',   // GLTF
+    'model/gltf-binary',    // GLB
+    'model/gltf+json',      // GLTF
     'application/pdf',
+    'text/plain',
+    'application/json',
     'application/zip',
+    'application/x-zip-compressed',
+    'multipart/x-zip',
   ];
 
   // Function to calculate byte size
@@ -137,12 +151,12 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
   const tooltipTitle = (
     <div>
       <Typography variant="subtitle2">Supported File Types:</Typography>
-      <Typography variant="body2">- Images: PNG, JPEG, GIF, SVG</Typography>
-      <Typography variant="body2">- Videos: MP4, WEBM</Typography>
-      <Typography variant="body2">- Audio: MP3, WAV, FLAC</Typography>
+      <Typography variant="body2">- Images: BMP, GIF, JPEG, PNG, APNG, SVG, WEBP</Typography>
+      <Typography variant="body2">- Videos: MP4, OGG, QuickTime, WEBM</Typography>
+      <Typography variant="body2">- Audio: MP3, OGG, WAV, WAVE, X-PN-WAV, VND.WAVE, X-WAV, FLAC</Typography>
       <Typography variant="body2">- 3D Models: GLB, GLTF</Typography>
-      <Typography variant="body2">- Text: PDF</Typography>
-      <Typography variant="body2">- Interactive: ZIP</Typography>
+      <Typography variant="body2">- Text: PDF, Plain Text, JSON</Typography>
+      <Typography variant="body2">- Interactive: ZIP, X-ZIP-COMPACTED, Multipart/X-ZIP</Typography>
       <br />
       <Typography variant="subtitle2">Maximum File Size:</Typography>
       <Typography variant="body2">20KB</Typography>
