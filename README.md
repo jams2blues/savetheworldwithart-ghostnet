@@ -21,7 +21,7 @@
 - [Contributing](#contributing)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
-
+- [Project Overview](# 1. Overview)
 ## Features
 
 - **Fully On-Chain NFT Management:** Create and store NFT metadata directly on the Tezos blockchain without relying on external storage services.
@@ -191,3 +191,91 @@ Taquito: The TypeScript library for interacting with the Tezos blockchain.
 Beacon Wallet: Simplifies Tezos wallet connections.
 Ecologi: For providing impactful environmental metrics.
 @JestemZero and @jams2blues: For their invaluable contributions to smart contract development and the Art-Tezos Ecosystem.
+
+SaveTheWorldWithArt.io — Fully On-Chain NFT Platform
+## 1. Overview
+# Two Contract Versions:
+
+Version 1 (Single Editions): Each NFT is fully unique, one mint per token.
+Version 2 (Multiple Editions): You can mint multiple editions of the same NFT at once.
+Fully On-Chain Metadata:
+All metadata (names, descriptions, images, etc.) is stored in (string, bytes) pairs directly on the Tezos blockchain, adhering to TZIP-12 or TZIP-16.
+
+# 2. Key Entrypoints
+Both V1 and V2 share the same basic set of entrypoints (functions you can call on the contract). You’ll see them in your front end when you’re minting or managing NFTs:
+
+mint
+
+V1: mint(metadata_map, to_address)
+V2: mint(amount, metadata_map, to_address)
+Creates a new NFT. In V2, amount is the number of editions minted at once.
+burn
+
+Removes an NFT (or an edition of it, in V2) from circulation by specifying its token ID.
+balance_of
+
+Queries NFT balances and responds via a callback.
+transfer
+
+Transfers NFTs from one address to another, used for normal ownership changes.
+update_operators
+
+Grants or revokes permission for a third party (“operator”) to manage your NFTs on your behalf.
+add_parent / add_child
+
+Lets you define hierarchical relationships between contracts (or tokens), e.g. a “child” NFT referencing another contract as a “parent.”
+remove_parent / remove_child
+
+Removes those hierarchical relationships.
+# 3. Contract Storage
+Each contract has a big map for metadata:
+
+Version 1 uses (map %metadata string bytes) for per-contract data, plus a big map token_metadata for each token’s metadata.
+Version 2 is similar but tracks a next_token_id to handle multiple tokens and their editions.
+All NFT metadata is stored as hex-encoded JSON in (string, bytes)—the TZIP-12 standard approach.
+
+# 4. Fully On-Chain (No IPFS)
+Unlike many platforms that store the “heavy lifting” (art images, scripts, etc.) off-chain, SaveTheWorldWithArt.io stores everything within Tezos contract storage. This can be more expensive in terms of storage fees but ensures the data can’t vanish or be changed if an off-chain service fails.
+
+# 5. File Size Constraints
+Because everything’s on-chain, you currently cap each file at 20KB per minted artifact. Larger files or scripts must be chunked or compressed.
+
+# 6. Potential Customizations
+If Rocky wants to build specialized functionality:
+
+Front-End Flow
+
+The entire front end is a React app that allows generating metadata, uploading an artifact (<=20KB), and calling the mint entrypoint.
+Additional logic can be added to gather chunked data from multiple NFTs (via add_child) if desired.
+Parent/Child Relationships
+
+You can create new references among tokens or even entire contracts.
+By default, it doesn’t “merge” data automatically—your front end or a custom viewer must interpret those links and unify the data.
+Cross-Chain
+
+Not natively supported, but you can store references to external chains in metadata fields. Any cross-chain logic will be done by a custom viewer or Oracle.
+# 7. Typical Workflow
+Generate a contract (Version 1 or 2) via your platform.
+Mint NFTs fully on-chain by providing name, description, art as a base64 data URI, etc., all within 20KB.
+(Optional) Use add_child or add_parent to create advanced relationships.
+Transfer or burn as desired.
+# 8. If You Want to Modify or Extend
+Repo Layout:
+The main React code is in src/components/MintBurnTransfer. These components handle the UI for minting, burning, transferring, plus advanced stuff (attributes, parent/child, etc.).
+Adding New Fields:
+You can store any new top-level metadata fields (like accessibility, etc.) as metadataMap.set("someField", hexStringOfYourJSON).
+Custom UI:
+Rocky can create or swap out the front-end calls to these entrypoints to tailor the user experience.
+9. Terms & Conditions
+The docs on our terms page outline everything at a high level. For a deeper look, folks can examine:
+
+src/components/MintBurnTransfer/Mint.js (mint logic & metadata handling)
+src/components/MintBurnTransfer/Transfer.js, Burn.js, etc.
+src\components\MintBurnTransfer\AddRemoveParentChild.js for the parent/child relationships.
+# TL;DR
+SaveTheWorldWithArt.io offers two FA2-based contracts (V1 single edition, V2 multi-edition) storing all metadata on-chain.
+Key entrypoints handle mint, burn, transfer, operators, and optional parent/child references.
+Everything is hex-encoded into (string, bytes) fields.
+A 20KB artifact limit is enforced to keep costs manageable.
+For advanced cross-chain or chunking behavior, you can build custom logic in the front end that references multiple NFTs or external chain data.
+That’s the fundamental gist. If Rocky needs more detail, he can read the actual contract code or poke around your React front end to see exactly how the calls are made.
