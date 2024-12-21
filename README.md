@@ -21,7 +21,6 @@
 - [Contributing](#contributing)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
-- [Project Overview](#1. Overview)
 ## Features
 
 - **Fully On-Chain NFT Management:** Create and store NFT metadata directly on the Tezos blockchain without relying on external storage services.
