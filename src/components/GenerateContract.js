@@ -38,9 +38,17 @@ const Container = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
   max-width: 1200px;
+  width: 95%;
+  box-sizing: border-box;
+
+  @media (max-width: 900px) {
+    padding: 15px;
+    width: 98%;
+  }
+
   @media (max-width: 600px) {
     padding: 10px;
-    margin: 10px auto;
+    width: 100%;
   }
 `;
 
@@ -64,7 +72,7 @@ const Preformatted = styled.pre`
   }
 `;
 
-// Utility Functions
+// Helper Functions
 
 /**
  * Converts a string to its hexadecimal representation.
@@ -180,6 +188,28 @@ const GenerateContract = () => {
     'application/json',
   ];
 
+  // Helper function to remove control characters without using regex
+  /**
+   * Removes control characters from a string without using regex.
+   * @param {string} str - The input string to sanitize.
+   * @returns {string} - The sanitized string without control characters.
+   */
+  const removeControlChars = (str) => {
+    let sanitizedStr = '';
+    for (let i = 0; i < str.length; i++) {
+      const code = str.charCodeAt(i);
+      // Allow printable characters and extended ASCII
+      if (
+        (code >= 0x20 && code <= 0x7E) || // Basic printable ASCII
+        (code >= 0xA0 && code <= 0xFF)    // Extended ASCII
+      ) {
+        sanitizedStr += str[i];
+      }
+      // Exclude characters outside these ranges (control characters)
+    }
+    return sanitizedStr;
+  };
+
   // Fetch and Prepare Michelson Code
   useEffect(() => {
     const fetchMichelson = async () => {
@@ -223,13 +253,19 @@ const GenerateContract = () => {
     }
   }, [walletAddress, isWalletConnected, formData.contractVersion]);
 
-  // Handle Input Changes
+  // Handle Input Changes with Sanitization for Description
   const handleInputChange = (e) => {
     const { name, value, checked, type } = e.target;
-    const newValue = type === 'checkbox' ? checked : value;
+    let newValue = type === 'checkbox' ? checked : value;
+
+    // Sanitize the description field by removing control characters without regex
+    if (name === 'description' && typeof newValue === 'string') {
+      newValue = removeControlChars(newValue);
+    }
+
     setFormData({ ...formData, [name]: newValue });
 
-    // Validate the field
+    // Validate the specific field that changed
     validateField(name, newValue);
   };
 
@@ -1049,7 +1085,7 @@ const GenerateContract = () => {
                 inputProps={{
                   maxLength: 250,
                 }}
-                helperText={`${formData.description.length}/250 characters`}
+                helperText={`${formData.description.length}/250 characters. Allowed: Letters, numbers, spaces, and standard punctuation (.,!?'"-). Control characters are not allowed.`} // **Added Detailed Helper Text**
                 error={!!formErrors.description}
                 FormHelperTextProps={{ style: { color: 'red' } }}
               />
