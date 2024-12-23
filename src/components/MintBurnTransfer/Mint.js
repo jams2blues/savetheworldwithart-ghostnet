@@ -42,7 +42,7 @@ const MAX_ATTRIBUTE_NAME_LENGTH = 32;
 const MAX_ATTRIBUTE_VALUE_LENGTH = 32;
 const MAX_EDITIONS = 10000; // Maximum editions cap
 
-// **New Constant for Royalty Limit**
+// New Constant for Royalty Limit
 const MAX_ROYALTIES = 25; // Maximum royalties cap
 
 // Helper function to convert string to hex
@@ -82,6 +82,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     license: '',
     customLicense: '',
     amount: '1', // Only for v2
+    nsfw: 'Does not contain NSFW', // New field
+    flashingHazard: 'Does not contain Flashing Hazard', // New field
   });
 
   // State variables for attributes
@@ -180,7 +182,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       ) {
         setSnackbar({
           open: true,
-          message: `Attribute name "${newAttributes[index].name}" is already in use. Please use unique names.`,
+          message: `Duplicate attribute name "${newAttributes[index].name}" detected. Please use unique names.`,
           severity: 'warning',
         });
         return;
@@ -252,8 +254,11 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     }
   };
 
-  // Function to estimate minting fees
-  const estimateMintFees = async () => {
+  /**
+   * Helper Function: Prepare Metadata Map
+   * Constructs and returns a MichelsonMap with all necessary NFT metadata fields.
+   */
+  const prepareMetadataMap = () => {
     const {
       name,
       description,
@@ -263,62 +268,90 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       royalties,
       license,
       customLicense,
-      amount,
+      nsfw,
+      flashingHazard,
     } = formData;
 
-    // Preliminary checks before estimation
-    if (!artifactFile || !artifactDataUrl || !toAddress.trim()) {
-      // Necessary fields are missing; cannot estimate
-      return null;
+    const metadataMap = new MichelsonMap();
+
+    // Required fields
+    metadataMap.set('name', '0x' + stringToHex(name));
+    metadataMap.set('description', '0x' + stringToHex(description));
+    metadataMap.set('artifactUri', '0x' + stringToHex(artifactDataUrl));
+    metadataMap.set(
+      'creators',
+      '0x' + stringToHex(JSON.stringify(creators.split(',').map((c) => c.trim())))
+    );
+
+    // Additional fields
+    if (license) {
+      const rightsValue = license === 'Custom' ? customLicense : license;
+      if (rightsValue) {
+        metadataMap.set('rights', '0x' + stringToHex(rightsValue));
+      }
+    }
+    metadataMap.set('decimals', '0x' + stringToHex('0')); // NFTs typically have 0 decimals
+    if (artifactFile.type) {
+      metadataMap.set('mimeType', '0x' + stringToHex(artifactFile.type));
     }
 
-    try {
-      // Prepare metadata map
-      const metadataMap = new MichelsonMap();
-
-      // Required fields
-      metadataMap.set('name', stringToHex(name));
-      metadataMap.set('description', stringToHex(description));
-      metadataMap.set('artifactUri', stringToHex(artifactDataUrl));
-      metadataMap.set(
-        'creators',
-        stringToHex(JSON.stringify(creators.split(',').map((c) => c.trim())))
-      );
-
-      // Additional fields
-      if (license) {
-        const rightsValue = license === 'Custom' ? customLicense : license;
-        if (rightsValue) {
-          metadataMap.set('rights', stringToHex(rightsValue));
-        }
-      }
-      metadataMap.set('decimals', stringToHex('0')); // NFTs typically have 0 decimals
-      if (artifactFile.type) {
-        metadataMap.set('mimeType', stringToHex(artifactFile.type));
-      }
-      // Royalties: decimals set to 4
-      metadataMap.set(
-        'royalties',
+    // Royalties: decimals set to 4
+    metadataMap.set(
+      'royalties',
+      '0x' +
         stringToHex(
           JSON.stringify({
             decimals: 4,
             shares: { [toAddress]: Math.round(royalties * 100) }, // e.g., 10% -> 1000
           })
         )
+    );
+
+    // Handle attributes
+    const filteredAttributes = attributes.filter((attr) => attr.name && attr.value);
+    if (filteredAttributes.length > 0) {
+      metadataMap.set('attributes', '0x' + stringToHex(JSON.stringify(filteredAttributes)));
+    }
+
+    if (tags) {
+      metadataMap.set(
+        'tags',
+        '0x' + stringToHex(JSON.stringify(tags.split(',').map((t) => t.trim())))
       );
+    }
 
-      // Handle attributes
-      const filteredAttributes = attributes.filter((attr) => attr.name && attr.value);
-      if (filteredAttributes.length > 0) {
-        metadataMap.set('attributes', stringToHex(JSON.stringify(filteredAttributes)));
-      }
+    // Handle NSFW
+    if (nsfw === 'Does contain NSFW') {
+      metadataMap.set('contentRating', '0x' + stringToHex('mature'));
+    }
 
-      if (tags) {
-        metadataMap.set(
-          'tags',
-          stringToHex(JSON.stringify(tags.split(',').map((t) => t.trim())))
-        );
-      }
+    // Handle Flashing Hazards
+    if (flashingHazard === 'Does contain Flashing Hazard') {
+      // Construct your hazards object
+      const accessibilityObj = { hazards: ["flashing"] };
+    
+      // Serialize to JSON and hex-encode
+      const accessibilityJson = JSON.stringify(accessibilityObj);
+      const accessibilityHex = "0x" + stringToHex(accessibilityJson);
+    
+      // Store as a top-level metadata field named "accessibility"
+      metadataMap.set("accessibility", accessibilityHex);
+    } 
+
+    return metadataMap;
+  };
+
+  // Function to estimate minting fees
+  const estimateMintFees = async () => {
+    // Preliminary checks before estimation
+    if (!artifactFile || !artifactDataUrl || !formData.toAddress.trim()) {
+      // Necessary fields are missing; cannot estimate
+      return null;
+    }
+
+    try {
+      // Prepare metadata map using the helper function
+      const metadataMap = prepareMetadataMap();
 
       console.log('Metadata Map for Estimation:', metadataMap);
 
@@ -328,9 +361,9 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       // Prepare mint operation
       let mintOperation;
       if (contractVersion === 'v2') {
-        mintOperation = contract.methods.mint(parseInt(amount, 10), metadataMap, toAddress);
+        mintOperation = contract.methods.mint(parseInt(formData.amount, 10), metadataMap, formData.toAddress);
       } else {
-        mintOperation = contract.methods.mint(metadataMap, toAddress);
+        mintOperation = contract.methods.mint(metadataMap, formData.toAddress);
       }
 
       console.log('Mint Operation for Estimation:', mintOperation);
@@ -369,7 +402,9 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       console.log(`Estimated Storage Cost: ${estimatedStorageCostTez} ꜩ`);
 
       // Calculate total estimated cost
-      const totalEstimatedCostTez = new BigNumber(estimatedFeeTez).plus(estimatedStorageCostTez).toFixed(6);
+      const totalEstimatedCostTez = new BigNumber(estimatedFeeTez)
+        .plus(estimatedStorageCostTez)
+        .toFixed(6);
 
       // Update estimation state
       setEstimation({
@@ -389,8 +424,12 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         totalEstimatedCostTez,
       };
     } catch (error) {
-      // Handle estimation errors silently or notify the user
-      console.error('Estimation Failed:', error);
+      console.error('estimateMintFees Error:', error);
+      setSnackbar({
+        open: true,
+        message: 'Failed to estimate minting fees.',
+        severity: 'error',
+      });
       return null;
     }
   };
@@ -462,7 +501,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       return;
     }
 
-    // **Updated Royalty Validation**
+    // Updated Royalty Validation
     if (royaltiesValue < 0 || royaltiesValue > MAX_ROYALTIES) {
       setSnackbar({
         open: true,
@@ -618,52 +657,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         return;
       }
 
-      // Prepare metadata map again for the actual mint operation
-      const metadataMap = new MichelsonMap();
-
-      // Required fields
-      metadataMap.set('name', stringToHex(formData.name));
-      metadataMap.set('description', stringToHex(formData.description));
-      metadataMap.set('artifactUri', stringToHex(artifactDataUrl));
-      metadataMap.set(
-        'creators',
-        stringToHex(JSON.stringify(formData.creators.split(',').map((c) => c.trim())))
-      );
-
-      // Additional fields
-      if (formData.license) {
-        const rightsValue = formData.license === 'Custom' ? formData.customLicense : formData.license;
-        if (rightsValue) {
-          metadataMap.set('rights', stringToHex(rightsValue));
-        }
-      }
-      metadataMap.set('decimals', stringToHex('0')); // NFTs typically have 0 decimals
-      if (artifactFile && artifactFile.type) { // Corrected access
-        metadataMap.set('mimeType', stringToHex(artifactFile.type));
-      }
-      // Royalties: decimals set to 4
-      metadataMap.set(
-        'royalties',
-        stringToHex(
-          JSON.stringify({
-            decimals: 4,
-            shares: { [formData.toAddress]: Math.round(formData.royalties * 100) }, // e.g., 25% -> 2500
-          })
-        )
-      );
-
-      // Handle attributes
-      const filteredAttributesFinal = attributes.filter((attr) => attr.name && attr.value);
-      if (filteredAttributesFinal.length > 0) {
-        metadataMap.set('attributes', stringToHex(JSON.stringify(filteredAttributesFinal)));
-      }
-
-      if (formData.tags) {
-        metadataMap.set(
-          'tags',
-          stringToHex(JSON.stringify(formData.tags.split(',').map((t) => t.trim())))
-        );
-      }
+      // Prepare metadata map again for the actual mint operation using the helper function
+      const metadataMap = prepareMetadataMap();
 
       console.log('Final Metadata Map:', metadataMap);
 
@@ -715,6 +710,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         license: '',
         customLicense: '',
         amount: '1',
+        nsfw: 'Does not contain NSFW',
+        flashingHazard: 'Does not contain Flashing Hazard',
       });
       setAttributes([{ name: '', value: '' }]);
       setArtifactFile(null);
@@ -846,7 +843,9 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               <MenuItem value="">Select a License</MenuItem>
               <MenuItem value="CC0 (Public Domain)">CC0 (Public Domain)</MenuItem>
               <MenuItem value="All Rights Reserved">All Rights Reserved</MenuItem>
-              <MenuItem value="On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z">On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z</MenuItem>
+              <MenuItem value="On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z">
+                On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z
+              </MenuItem>
               <MenuItem value="CC BY 4.0">CC BY 4.0</MenuItem>
               <MenuItem value="CC BY-SA 4.0">CC BY-SA 4.0</MenuItem>
               <MenuItem value="CC BY-ND 4.0">CC BY-ND 4.0</MenuItem>
@@ -876,6 +875,49 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             />
           </Grid>
         )}
+        {/* NSFW Content Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth>
+            <InputLabel id="nsfw-label">NSFW Content</InputLabel>
+            <Select
+              labelId="nsfw-label"
+              name="nsfw"
+              value={formData.nsfw}
+              onChange={handleInputChange}
+              label="NSFW Content"
+            >
+              <MenuItem value="Does not contain NSFW">Does not contain NSFW</MenuItem>
+              <MenuItem value="Does contain NSFW">Does contain NSFW</MenuItem>
+            </Select>
+          </FormControl>
+          {/* Explanatory Text Below NSFW Dropdown */}
+          <Typography variant="caption" color="textSecondary" sx={{ marginTop: '4px', display: 'block' }}>
+            NSFW includes Nudity, pornography, profanity, slurs, graphic violence, or other potentially disturbing subject matter.
+          </Typography>
+        </Grid>
+        {/* Flashing Hazards Dropdown */}
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth>
+            <InputLabel id="flashing-hazard-label">Flashing Hazards</InputLabel>
+            <Select
+              labelId="flashing-hazard-label"
+              name="flashingHazard"
+              value={formData.flashingHazard}
+              onChange={handleInputChange}
+              label="Flashing Hazards"
+            >
+              <MenuItem value="Does not contain Flashing Hazard">Does not contain Flashing Hazard</MenuItem>
+              <MenuItem value="Does contain Flashing Hazard">
+                Does contain Flashing Hazard
+              </MenuItem>
+            </Select>
+            <Typography variant="caption" display="block" sx={{ marginTop: '4px' }}>
+              <Link href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value" target="_blank" rel="noopener noreferrer">
+                Learn More
+              </Link>
+            </Typography>
+          </FormControl>
+        </Grid>
         {/* Attributes */}
         <Grid item xs={12}>
           <Typography variant="body1">Attributes</Typography>
@@ -975,7 +1017,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           variant="contained"
           color="success"
           onClick={handleMintButtonClick}
-          disabled={loading || !agreedToTerms} // **Adjusted Disabled State**
+          disabled={loading || !agreedToTerms} // Adjusted Disabled State
           startIcon={loading && <CircularProgress size={20} />}
           aria-label="Mint NFT"
         >
@@ -989,26 +1031,26 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           <Typography variant="body2">
             <strong>Fee:</strong> {estimation.estimatedFeeTez} ꜩ{' '}
             <Tooltip title="The network fee required to process the minting transaction on the Tezos blockchain." arrow>
-              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
             <strong>Storage Cost:</strong> {estimation.estimatedStorageCostTez} ꜩ{' '}
             <Tooltip title="The cost for storing your NFT's data and metadata on the blockchain." arrow>
-              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
             </Tooltip>
           </Typography>
-          <Typography variant="body2" style={{ marginTop: '10px' }}>
+          <Typography variant="body2" sx={{ marginTop: '10px' }}>
             <strong>Total Estimated Cost:</strong> {estimation.totalEstimatedCostTez} ꜩ{' '}
             <Tooltip title="The sum of the network fee and storage cost required to mint your NFT." arrow>
-              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
             </Tooltip>
           </Typography>
         </Section>
       )}
       {/* Add the desired text after the Mint button */}
       <Section>
-        <Typography variant="body2" style={{ marginTop: '10px', textAlign: 'right' }}>
+        <Typography variant="body2" sx={{ marginTop: '10px', textAlign: 'right' }}>
           After minting, check OBJKT! ✌️🤟🤘
         </Typography>
       </Section>
@@ -1023,7 +1065,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           </Typography>
           <Typography
             variant="body1"
-            style={{
+            sx={{
               wordBreak: 'break-all',
               backgroundColor: '#f5f5f5',
               padding: '10px',
@@ -1036,11 +1078,11 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             variant="contained"
             color="secondary"
             onClick={() => navigator.clipboard.writeText(contractAddress)}
-            style={{ marginTop: '10px' }}
+            sx={{ marginTop: '10px' }}
           >
             Copy Contract Address
           </Button>
-          <Typography variant="body2" style={{ marginTop: '10px' }}>
+          <Typography variant="body2" sx={{ marginTop: '10px' }}>
             Please check your contract on{' '}
             <Link
               href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
@@ -1076,22 +1118,28 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           <DialogContentText>
             Please review the estimated fees and gas costs before proceeding with minting your NFT.
           </DialogContentText>
-          <Typography variant="body2" style={{ marginTop: '10px' }}>
+          <Typography variant="body2" sx={{ marginTop: '10px' }}>
             <strong>Estimated Fee:</strong> {confirmDialog.estimatedFeeTez} ꜩ{' '}
             <Tooltip title="The network fee required to process the minting transaction on the Tezos blockchain." arrow>
-              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
             <strong>Estimated Storage Cost:</strong> {confirmDialog.estimatedStorageCostTez} ꜩ{' '}
             <Tooltip title="The cost for storing your NFT's data and metadata on the blockchain." arrow>
-              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
             </Tooltip>
           </Typography>
-          <Typography variant="body2" style={{ marginTop: '10px' }}>
+          <Typography variant="body2">
+            <strong>Estimated Gas Limit:</strong> {confirmDialog.estimatedGasLimit}
+          </Typography>
+          <Typography variant="body2">
+            <strong>Estimated Storage Limit:</strong> {confirmDialog.estimatedStorageLimit}
+          </Typography>
+          <Typography variant="body2" sx={{ marginTop: '10px' }}>
             <strong>Total Estimated Cost:</strong> {confirmDialog.totalEstimatedCostTez} ꜩ{' '}
             <Tooltip title="The sum of the network fee and storage cost required to mint your NFT." arrow>
-              <InfoIcon fontSize="small" style={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: '5px', verticalAlign: 'middle', cursor: 'pointer' }} />
             </Tooltip>
           </Typography>
         </DialogContent>
@@ -1107,7 +1155,6 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       {/* Removed Local Snackbar */}
     </div>
   );
-
 };
 
 export default Mint;

@@ -146,6 +146,9 @@ const GenerateContract = () => {
   // Define the symbol validation regex
   const symbolPattern = /^[A-Za-z0-9]{3,5}$/;
 
+  // Define the authors validation regex
+  const authorsPattern = /^[A-Za-z0-9\s.,'-]+$/;
+
   // Supported Filetypes List
   const supportedFiletypesList = [
     'image/bmp',
@@ -292,6 +295,43 @@ const GenerateContract = () => {
         }
         break;
 
+      case 'authors':
+        if (!value) {
+          errors.authors = 'Author(s) are required.';
+        } else if (value.length > 50) {
+          errors.authors = 'Author(s) cannot exceed 50 characters.';
+        } else {
+          const authorsArray = value.split(',').map((a) => a.trim());
+          for (let author of authorsArray) {
+            if (!authorsPattern.test(author)) {
+              errors.authors = 'Author names can only contain letters, numbers, spaces, and standard punctuation (.,\'-). Emojis and special characters are not allowed.';
+              break;
+            }
+          }
+          if (!errors.authors) {
+            delete errors.authors;
+          }
+        }
+        break;
+
+      case 'authorAddresses':
+        const authorsCount = formData.authors.split(',').map((a) => a.trim()).filter((a) => a !== '').length;
+        const authorAddressesArray = value.split(',').map((a) => a.trim()).filter((a) => a !== '');
+        if (authorsCount !== authorAddressesArray.length) {
+          errors.authorAddresses = 'Number of authors and author addresses must match.';
+        } else {
+          for (let addr of authorAddressesArray) {
+            if (!isValidTezosAddress(addr)) {
+              errors.authorAddresses = `Invalid Tezos address detected: ${addr}`;
+              break;
+            }
+          }
+          if (!errors.authorAddresses) {
+            delete errors.authorAddresses;
+          }
+        }
+        break;
+
       case 'imageUri':
         if (!value) {
           errors.imageUri = 'Image URI is required.';
@@ -323,41 +363,95 @@ const GenerateContract = () => {
 
   // Validate the Entire Form
   const validateForm = () => {
-    const fields = Object.keys(formData);
-    let valid = true;
+    let errors = {};
 
-    fields.forEach((field) => {
-      validateField(field, formData[field]);
-      if (formErrors[field]) {
-        valid = false;
-      }
-    });
+    // Validate all fields
+    if (!formData.name) {
+      errors.name = 'Name is required.';
+    } else if (formData.name.length > 30) {
+      errors.name = 'Name cannot exceed 30 characters.';
+    }
 
-    const authors = formData.authors.split(',').map((a) => a.trim()).filter((a) => a !== '');
-    const authorAddresses = formData.authorAddresses.split(',').map((a) => a.trim()).filter((a) => a !== '');
+    if (!formData.description) {
+      errors.description = 'Description is required.';
+    } else if (formData.description.length > 250) {
+      errors.description = 'Description cannot exceed 250 characters.';
+    }
 
-    if (authors.length !== authorAddresses.length) {
-      setFormErrors((prev) => ({
-        ...prev,
-        authorAddresses: 'Number of authors and author addresses must match.',
-      }));
-      valid = false;
+    if (!formData.symbol) {
+      errors.symbol = 'Symbol is required.';
+    } else if (formData.symbol.length < 3) {
+      errors.symbol = 'Symbol must be at least 3 characters.';
+    } else if (formData.symbol.length > 5) {
+      errors.symbol = 'Symbol cannot exceed 5 characters.';
+    } else if (!symbolPattern.test(formData.symbol)) {
+      errors.symbol = 'Symbol must contain only letters and numbers.';
+    }
+
+    if (!formData.creators) {
+      errors.creators = 'Creator(s) are required.';
+    } else if (formData.creators.length > 200) {
+      errors.creators = 'Creator(s) cannot exceed 200 characters.';
     } else {
-      setFormErrors((prev) => {
-        const { authorAddresses, ...rest } = prev;
-        return rest;
-      });
+      const creatorsArray = formData.creators.split(',').map((c) => c.trim());
+      const uniqueCreators = new Set(creatorsArray);
+      if (uniqueCreators.size !== creatorsArray.length) {
+        errors.creators = 'Duplicate creators detected.';
+      } else {
+        for (let addr of creatorsArray) {
+          if (!isValidTezosAddress(addr)) {
+            errors.creators = `Invalid Tezos address detected: ${addr}`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (!formData.authors) {
+      errors.authors = 'Author(s) are required.';
+    } else if (formData.authors.length > 50) {
+      errors.authors = 'Author(s) cannot exceed 50 characters.';
+    } else {
+      const authorsArray = formData.authors.split(',').map((a) => a.trim());
+      for (let author of authorsArray) {
+        if (!authorsPattern.test(author)) {
+          errors.authors = 'Author names can only contain letters, numbers, spaces, and standard punctuation (.,\'-). Emojis and special characters are not allowed.';
+          break;
+        }
+      }
+    }
+
+    const authorsCount = formData.authors.split(',').map((a) => a.trim()).filter((a) => a !== '').length;
+    const authorAddressesArray = formData.authorAddresses.split(',').map((a) => a.trim()).filter((a) => a !== '');
+    if (authorsCount !== authorAddressesArray.length) {
+      errors.authorAddresses = 'Number of authors and author addresses must match.';
+    } else {
+      for (let addr of authorAddressesArray) {
+        if (!isValidTezosAddress(addr)) {
+          errors.authorAddresses = `Invalid Tezos address detected: ${addr}`;
+          break;
+        }
+      }
+    }
+
+    if (!formData.imageUri) {
+      errors.imageUri = 'Image URI is required.';
+    } else {
+      const byteSize = getByteSize(formData.imageUri);
+      if (byteSize > 20000) {
+        errors.imageUri =
+          'Image URI must be under 20KB. OBJKT and other platforms may not display thumbnails if it’s too long. Test on Ghostnet first, and compress your image to keep it tiny.';
+      }
     }
 
     if (!formData.agreeToTerms) {
-      setFormErrors((prev) => ({
-        ...prev,
-        agreeToTerms: 'You must agree to the terms and conditions.',
-      }));
-      valid = false;
+      errors.agreeToTerms = 'You must agree to the terms and conditions.';
     }
 
-    return valid;
+    setFormErrors(errors);
+
+    // Return true if no errors
+    return Object.keys(errors).length === 0;
   };
 
   // Handle Thumbnail Upload
@@ -550,24 +644,24 @@ const GenerateContract = () => {
       }
 
       let estimatedFeeTezLocal = null;
-      let estimatedGasLimit = null;
-      let estimatedStorageLimit = null;
+      let estimatedGasLimitLocal = null;
+      let estimatedStorageLimitLocal = null;
       let storageCostTez = null;
       let totalEstimatedCostTez = null;
       let estimatedBalanceChange = null;
 
       if (originationEstimation) {
         const estimatedFeeMutez = originationEstimation.suggestedFeeMutez;
-        estimatedGasLimit = originationEstimation.gasLimit;
-        estimatedStorageLimit = originationEstimation.storageLimit;
+        estimatedGasLimitLocal = originationEstimation.gasLimit;
+        estimatedStorageLimitLocal = originationEstimation.storageLimit;
 
         estimatedFeeTezLocal = new BigNumber(estimatedFeeMutez).dividedBy(1e6).toFixed(6);
         setEstimatedFeeTez(estimatedFeeTezLocal);
-        setEstimatedGasLimit(estimatedGasLimit);
-        setEstimatedStorageLimit(estimatedStorageLimit);
+        setEstimatedGasLimit(estimatedGasLimitLocal);
+        setEstimatedStorageLimit(estimatedStorageLimitLocal);
 
         // Calculate Storage Cost
-        storageCostTez = new BigNumber(estimatedStorageLimit).multipliedBy(STORAGE_COST_PER_BYTE).toFixed(6);
+        storageCostTez = new BigNumber(estimatedStorageLimitLocal).multipliedBy(STORAGE_COST_PER_BYTE).toFixed(6);
 
         // Calculate Total Estimated Cost
         totalEstimatedCostTez = new BigNumber(estimatedFeeTezLocal).plus(storageCostTez).toFixed(6);
@@ -600,8 +694,8 @@ const GenerateContract = () => {
         open: true,
         data: {
           estimatedFeeTez: estimatedFeeTezLocal,
-          estimatedGasLimit: estimatedGasLimit,
-          estimatedStorageLimit: estimatedStorageLimit,
+          estimatedGasLimit: estimatedGasLimitLocal,
+          estimatedStorageLimit: estimatedStorageLimitLocal,
           storageCostTez: storageCostTez, // New field
           estimatedBalanceChangeTez: estimatedBalanceChange,
         },
@@ -788,24 +882,6 @@ const GenerateContract = () => {
   const handleCloseContractDialog = () => {
     setContractDialogOpen(false);
   };
-
-  // Real-Time Validation for Authors and Author Addresses
-  useEffect(() => {
-    const authors = formData.authors.split(',').map((a) => a.trim()).filter((a) => a !== '');
-    const authorAddresses = formData.authorAddresses.split(',').map((a) => a.trim()).filter((a) => a !== '');
-
-    if (authors.length !== authorAddresses.length) {
-      setFormErrors((prev) => ({
-        ...prev,
-        authorAddresses: 'Number of authors and author addresses must match.',
-      }));
-    } else {
-      setFormErrors((prev) => {
-        const { authorAddresses, ...rest } = prev;
-        return rest;
-      });
-    }
-  }, [formData.authors, formData.authorAddresses]);
 
   // Handle Before Unload Event to Warn User
   useEffect(() => {
