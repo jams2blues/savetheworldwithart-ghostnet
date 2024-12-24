@@ -44,12 +44,12 @@ const MAX_ATTRIBUTE_NAME_LENGTH = 32;
 const MAX_ATTRIBUTE_VALUE_LENGTH = 32;
 const MAX_EDITIONS = 10000; // Maximum editions cap
 
-// New Constants for Tag Validation
+// Constants for Tag Validation
 const MAX_TAGS = 10;
 const MAX_TAG_LENGTH = 20;
-const TAG_REGEX = /^[a-zA-Z0-9-_]+$/; // Allowed characters: alphanumeric, hyphens, underscores
+const TAG_REGEX = /^[a-zA-Z0-9-_]+$/; // Allowed characters: alphanumeric, hyphens (-), underscores (_)
 
-// New Constant for Royalty Limit
+// Constant for Royalty Limit
 const MAX_ROYALTIES = 25; // Maximum royalties cap
 
 // Helper function to convert string to hex
@@ -131,8 +131,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
 
   // Handle input changes for form fields
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    let newValue = value;
+    const { name, value, checked, type } = e.target;
+    let newValue = type === 'checkbox' ? checked : value;
 
     // If the field is 'amount', enforce the maximum and minimum limits
     if (name === 'amount') {
@@ -240,11 +240,6 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     setAgreedToTerms(e.target.checked);
   };
 
-  // Handle tag input changes
-  const handleTagInputChange = (e) => {
-    setTagInput(e.target.value);
-  };
-
   // Function to add a single tag
   const addTag = (tag) => {
     const trimmedTag = tag.trim().toLowerCase();
@@ -315,22 +310,27 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     if (skippedCount > 0) {
       setSnackbar({
         open: true,
-        message: `Only ${addedCount} tags were added. ${skippedCount} tags were skipped due to validation rules or exceeding the maximum limit.`,
+        message: `Only ${addedCount} tag(s) were added. ${skippedCount} tag(s) were skipped due to validation rules or exceeding the maximum limit.`,
         severity: 'warning',
       });
     }
   };
 
-  // Handle tag input key presses
-  const handleTagInputKeyDown = (e) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      if (tagInput) {
-        const newTags = tagInput.split(',').map((t) => t.trim()).filter((t) => t !== '');
-        addTags(newTags);
-        setTagInput('');
-      }
+  // Handle tag input changes
+  const handleTagInputChange = (e) => {
+    const { value } = e.target;
+    // Split input by commas
+    const parts = value.split(',');
+    const lastPart = parts.pop(); // The last part is the current incomplete tag
+
+    // Add all complete tags
+    const newTags = parts.map((t) => t.trim()).filter((t) => t !== '');
+    if (newTags.length > 0) {
+      addTags(newTags);
     }
+
+    // Update the tagInput with the incomplete tag
+    setTagInput(lastPart);
   };
 
   // Handle tag paste
@@ -619,7 +619,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       return;
     }
 
-    // Updated Royalty Validation
+    // Royalty Validation
     if (royaltiesValue < 0 || royaltiesValue > MAX_ROYALTIES) {
       setSnackbar({
         open: true,
@@ -701,6 +701,16 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         });
         return;
       }
+    }
+
+    // Ensure the user has agreed to the terms before proceeding
+    if (!agreedToTerms) {
+      setSnackbar({
+        open: true,
+        message: 'You must agree to the terms and conditions before minting.',
+        severity: 'warning',
+      });
+      return;
     }
 
     try {
@@ -930,6 +940,9 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
                 maxWidth: '100%',
                 maxHeight: '300px',
                 marginTop: '10px',
+                borderRadius: '8px',
+                objectFit: 'contain', // Prevent image distortion
+                backgroundColor: '#f5f5f5', // Optional: add a background to better visualize images with transparency
               }}
             />
           </Grid>
@@ -1036,16 +1049,15 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               label="Flashing Hazards"
             >
               <MenuItem value="Does not contain Flashing Hazard">Does not contain Flashing Hazard</MenuItem>
-              <MenuItem value="Does contain Flashing Hazard">
-                Does contain Flashing Hazard
-              </MenuItem>
+              <MenuItem value="Does contain Flashing Hazard">Does contain Flashing Hazard</MenuItem>
             </Select>
-            <Typography variant="caption" display="block" sx={{ marginTop: '4px' }}>
-              <Link href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value" target="_blank" rel="noopener noreferrer">
-                Learn More
-              </Link>
-            </Typography>
           </FormControl>
+          {/* "Learn More" Link Below Flashing Hazards Dropdown */}
+          <Typography variant="caption" display="block" sx={{ marginTop: '4px' }}>
+            <Link href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value" target="_blank" rel="noopener noreferrer">
+              Learn More
+            </Link>
+          </Typography>
         </Grid>
         {/* Attributes */}
         <Grid item xs={12}>
@@ -1109,7 +1121,6 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             name="tags"
             value={tagInput}
             onChange={handleTagInputChange}
-            onKeyDown={handleTagInputKeyDown}
             onPaste={handleTagPaste}
             fullWidth
             placeholder="Enter tags separated by commas (e.g., art, pixelart, foc)"
@@ -1174,7 +1185,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           variant="contained"
           color="success"
           onClick={handleMintButtonClick}
-          disabled={loading || !agreedToTerms} // Adjusted Disabled State
+          disabled={loading || !agreedToTerms} // Disable if loading or not agreed
           startIcon={loading && <CircularProgress size={20} />}
           aria-label="Mint NFT"
         >
