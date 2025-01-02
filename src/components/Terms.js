@@ -30,10 +30,10 @@ const Terms = () => {
             <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '1rem' } }}>
               <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full
               responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or
-              altered once deployed. Save The World With Art™ holds no liability for any content you create or deploy.
+              altered once deployed. ZeroContract™ holds no liability for any content you create or deploy.
               Always test thoroughly on{' '}
               <Link
-                href="https://ghostnet.savetheworldwithart.io"
+                href="https://ghostnet.zerocontract.io"
                 color="primary"
                 underline="hover"
                 target="_blank"
@@ -53,28 +53,28 @@ const Terms = () => {
           <strong>Last Updated:</strong> November 14, 2023
         </Typography>
         <Typography variant="body2" paragraph>
-          Welcome to SaveTheWorldWithArt.io! By accessing or using our platform, you agree to be bound by these Terms and Conditions. Please read them carefully.
+          Welcome to the Zero Contract! By accessing or using our platform, you agree to be bound by these Terms and Conditions. Please read them carefully.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
           1. Acceptance of Terms
         </Typography>
         <Typography variant="body2" paragraph>
-          By using SaveTheWorldWithArt.io, you accept these Terms and Conditions in full. If you disagree with any part of these terms, do not use our platform.
+          By using The Zero Contract, you accept these Terms and Conditions in full. If you disagree with any part of these terms, do not use our platform.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
           2. Use of the Platform
         </Typography>
         <Typography variant="body2" paragraph>
-          SaveTheWorldWithArt.io allows artists to create, manage, deploy, and mint NFTs directly on the Tezos blockchain. You agree to use the platform solely for lawful purposes and in a manner that does not infringe the rights of others.
+          The Zero Contract allows artists to create, manage, deploy, and mint NFTs directly on the Tezos blockchain. You agree to use the platform solely for lawful purposes and in a manner that does not infringe the rights of others.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
           3. Intellectual Property
         </Typography>
         <Typography variant="body2" paragraph>
-          You retain ownership of all intellectual property rights in the content you create and upload. By deploying NFTs through our platform, you grant SaveTheWorldWithArt.io a non-exclusive, worldwide, royalty-free license to use, reproduce, and display your content as necessary to provide the services.
+          You retain ownership of all intellectual property rights in the content you create and upload. By deploying NFTs through our platform, you grant The Zero Contract a non-exclusive, worldwide, royalty-free license to use, reproduce, and display your content as necessary to provide the services.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
@@ -88,21 +88,21 @@ const Terms = () => {
           5. Limitation of Liability
         </Typography>
         <Typography variant="body2" paragraph>
-          SaveTheWorldWithArt.io shall not be liable for any direct, indirect, incidental, or consequential damages arising from your use of the platform.
+          The Zero Contract shall not be liable for any direct, indirect, incidental, or consequential damages arising from your use of the platform.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
           6. Indemnification
         </Typography>
         <Typography variant="body2" paragraph>
-          You agree to indemnify and hold harmless SaveTheWorldWithArt.io from any claims, damages, losses, liabilities, and expenses arising out of your use of the platform.
+          You agree to indemnify and hold harmless The Zero Contract from any claims, damages, losses, liabilities, and expenses arising out of your use of the platform.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
           7. Governing Law
         </Typography>
         <Typography variant="body2" paragraph>
-          These Terms and Conditions are governed by and construed in accordance with the laws of the jurisdiction in which SaveTheWorldWithArt.io operates.
+          These Terms and Conditions are governed by and construed in accordance with the laws of the jurisdiction in which The Zero Contract operates.
         </Typography>
 
         <Typography variant="h6" gutterBottom>
@@ -116,7 +116,17 @@ const Terms = () => {
           9. Contact Us
         </Typography>
         <Typography variant="body2" paragraph>
-          If you have any questions about these Terms and Conditions, please contact us at <a href="mailto:support@savetheworldwithart.io">support@savetheworldwithart.io</a>.
+          If you have any questions about these Terms and Conditions, please contact us on Twitter{' '}
+          <Link
+            href="https://x.com/JestemZero"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="primary"
+            underline="hover"
+          >
+            @jestemZero
+          </Link>
+          .
         </Typography>
 
         {/* Updated Section: Understanding #ZeroContracts */}
@@ -124,7 +134,7 @@ const Terms = () => {
           10. How #ZeroContracts Work
         </Typography>
         <Typography variant="body2" paragraph>
-          At SaveTheWorldWithArt.io, we offer two versions of our smart contracts, known as <strong>#ZeroContracts</strong>, designed to simplify the process of creating and managing your NFT collections on the Tezos blockchain. Both versions share the following key entrypoints:
+          At The Zero Contract, we offer two versions of our smart contracts, known as <strong>#ZeroContracts</strong>, designed to simplify the process of creating and managing your NFT collections on the Tezos blockchain. Both versions share the following key entrypoints:
         </Typography>
         <ul>
           <li>
@@ -186,7 +196,7 @@ const Terms = () => {
         </Typography>
 
         <Typography variant="body2" paragraph>
-          By using SaveTheWorldWithArt.io, you embrace the ease and security of deploying your art as NFTs on the Tezos blockchain, contributing to a sustainable and decentralized digital art ecosystem.
+          By using the Zero Contract, you embrace the ease and security of deploying your art as NFTs on the Tezos blockchain, contributing to a sustainable and decentralized digital art ecosystem.
         </Typography>
       </StyledPaper>
     </StyledContainer>

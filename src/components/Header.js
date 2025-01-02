@@ -20,7 +20,7 @@ import styled from 'styled-components';
 import { WalletContext } from '../contexts/WalletContext';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import MenuIcon from '@mui/icons-material/Menu';
-import { ReactComponent as Logo } from '../logo.svg'; // Ensure the path is correct
+import { ReactComponent as Logo } from '../logo.svg';
 
 const StyledLink = styled(Link)`
   text-decoration: none;
@@ -56,7 +56,7 @@ const Header = () => {
 
   return (
     <>
-      <AppBar position="static">
+      <AppBar position="static" sx={{ backgroundColor: 'darkgreen' }}>
         <Toolbar>
           {/* Hamburger Menu for Mobile */}
           <Box sx={{ display: { xs: 'block', sm: 'none' }, mr: 2 }}>
@@ -101,7 +101,7 @@ const Header = () => {
 
           {/* Title */}
           <Typography variant="h6" sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>
-            Save The World With Art™ Beta
+            ZeroContract Beta
           </Typography>
 
           {/* Navigation Links for Desktop */}
@@ -133,7 +133,11 @@ const Header = () => {
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
           {snackbar.message}
         </Alert>
       </Snackbar>

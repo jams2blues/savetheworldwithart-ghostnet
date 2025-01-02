@@ -1,4 +1,4 @@
-// frontend/src/components/MintBurnTransfer/Mint.js
+// src/components/MintBurnTransfer/Mint.js
 
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';

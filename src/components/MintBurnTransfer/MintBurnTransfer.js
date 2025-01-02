@@ -1,4 +1,4 @@
-// frontend/src/components/MintBurnTransfer/MintBurnTransfer.js
+// src/components/MintBurnTransfer/MintBurnTransfer.js
 
 import React, { useState, useContext } from 'react';
 import styled from 'styled-components';
@@ -21,6 +21,8 @@ import Transfer from './Transfer';
 import BalanceOf from './BalanceOf';
 import UpdateOperators from './UpdateOperators';
 import AddRemoveParentChild from './AddRemoveParentChild';
+
+// Removed MintChunked and MintInteractive imports
 
 // Styled Components
 const StyledPaper = styled(Paper)`
@@ -258,11 +260,13 @@ const MintBurnTransfer = () => {
                       >
                         Mint
                       </Button>
+                      {/* Removed Mint Chunked NFT Button */}
+                      {/* Removed Mint Interactive NFT Button */}
                     </Stack>
                     <Typography variant="body2" align="center" sx={{ maxWidth: '300px' }}>
                       {contractVersion === 'v2'
-                        ? 'Mint multiple editions of an NFT to a recipient.'
-                        : 'Mint a single edition NFT to a recipient.'}
+                        ? 'Mint multiple editions or interactive NFTs to a recipient.'
+                        : 'Mint single edition NFTs or interactive NFTs to a recipient.'}
                     </Typography>
 
                     {/* Burn Button and Description */}

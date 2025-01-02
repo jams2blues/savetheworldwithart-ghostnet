@@ -9,10 +9,8 @@ import { ReactComponent as Logo } from '../logo.svg'; // Adjust the path if nece
 // Styled Container with responsive padding
 const StyledContainer = styled(Container)`
   padding: 40px 20px;
-
-  @media (max-width: 600px) {
-    padding: 20px 10px;
-  }
+  margin: 20px auto;
+  max-width: 800px;
 `;
 
 const Home = () => {
@@ -39,7 +37,7 @@ const Home = () => {
               gutterBottom
               sx={{ fontSize: { xs: '2rem', md: '3rem' } }}
             >
-              Welcome to SaveTheWorldWithArt™
+              Welcome to ZeroContract™
             </Typography>
             <Typography
               variant="h6"
@@ -82,7 +80,7 @@ const Home = () => {
           >
             <Box
               component={Logo}
-              alt="SaveTheWorldWithArt Logo"
+              alt="ZeroContract Logo"
               sx={{
                 width: { xs: '80%', sm: '60%', md: '50%' },
                 maxWidth: '400px',
