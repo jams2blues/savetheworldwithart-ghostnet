@@ -1,6 +1,6 @@
-# SaveTheWorldWithArt.io
+# The Zero Contract
 
-**SaveTheWorldWithArt.io** is a cutting-edge, web-based platform that empowers artists to create, manage, deploy, and mint NFTs directly on the Tezos blockchain. By ensuring that all art and provenance data are stored fully on-chain, SaveTheWorldWithArt.io eliminates the need for third-party storage solutions like IPFS or Arweave, providing an immutable and seamless experience for artists and collectors alike.
+**The Zero Contract** is a cutting-edge, web-based platform that empowers artists to create, manage, deploy, and mint NFTs directly on the Tezos blockchain. By ensuring that all art and provenance data are stored fully on-chain, SaveTheWorldWithArt.io eliminates the need for third-party storage solutions like IPFS or Arweave, providing an immutable and seamless experience for artists and collectors alike.
 
 ## Table of Contents
 
@@ -132,7 +132,7 @@ Update Operators: Grant or revoke operator permissions for managing your NFTs.
 Balance Of: Check the NFT balance for a specific address and token ID.
 
 ### API Integration
-SaveTheWorldWithArt.io integrates with the Ecologi API to display real-time impact metrics, such as:
+The Zero Contract integrates with the Ecologi API to display real-time impact metrics, such as:
 
 Total Trees Planted
 Total Carbon Offset
@@ -191,7 +191,7 @@ Beacon Wallet: Simplifies Tezos wallet connections.
 Ecologi: For providing impactful environmental metrics.
 @JestemZero and @jams2blues: For their invaluable contributions to smart contract development and the Art-Tezos Ecosystem.
 
-SaveTheWorldWithArt.io — Fully On-Chain NFT Platform
+The Zero Contract — Fully On-Chain NFT Platform
 ## 1. Overview
 # Two Contract Versions:
 
@@ -234,7 +234,7 @@ Version 2 is similar but tracks a next_token_id to handle multiple tokens and th
 All NFT metadata is stored as hex-encoded JSON in (string, bytes)—the TZIP-12 standard approach.
 
 # 4. Fully On-Chain (No IPFS)
-Unlike many platforms that store the “heavy lifting” (art images, scripts, etc.) off-chain, SaveTheWorldWithArt.io stores everything within Tezos contract storage. This can be more expensive in terms of storage fees but ensures the data can’t vanish or be changed if an off-chain service fails.
+Unlike many platforms that store the “heavy lifting” (art images, scripts, etc.) off-chain, The Zero Contract stores everything within Tezos contract storage. This can be more expensive in terms of storage fees but ensures the data can’t vanish or be changed if an off-chain service fails.
 
 # 5. File Size Constraints
 Because everything’s on-chain, you currently cap each file at 20KB per minted artifact. Larger files or scripts must be chunked or compressed.
@@ -265,14 +265,18 @@ Adding New Fields:
 You can store any new top-level metadata fields (like accessibility, etc.) as metadataMap.set("someField", hexStringOfYourJSON).
 Custom UI:
 Rocky can create or swap out the front-end calls to these entrypoints to tailor the user experience.
+<<<<<<< HEAD
+9. Terms & Conditions
+=======
 # 9. Terms & Conditions
+>>>>>>> d7ac443abb8ef8ef2b87fa20798ec84498930919
 The docs on our terms page outline everything at a high level. For a deeper look, folks can examine:
 
 src/components/MintBurnTransfer/Mint.js (mint logic & metadata handling)
 src/components/MintBurnTransfer/Transfer.js, Burn.js, etc.
 src\components\MintBurnTransfer\AddRemoveParentChild.js for the parent/child relationships.
 # TL;DR
-SaveTheWorldWithArt.io offers two FA2-based contracts (V1 single edition, V2 multi-edition) storing all metadata on-chain.
+The Zero Contract offers two FA2-based contracts (V1 single edition, V2 multi-edition) storing all metadata on-chain.
 Key entrypoints handle mint, burn, transfer, operators, and optional parent/child references.
 Everything is hex-encoded into (string, bytes) fields.
 A 20KB artifact limit is enforced to keep costs manageable.
