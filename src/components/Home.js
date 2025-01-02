@@ -37,7 +37,7 @@ const Home = () => {
               gutterBottom
               sx={{ fontSize: { xs: '2rem', md: '3rem' } }}
             >
-              Welcome to ZeroContract™
+              Welcome to ZeroContract
             </Typography>
             <Typography
               variant="h6"
