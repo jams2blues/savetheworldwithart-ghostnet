@@ -525,7 +525,7 @@ const GenerateContract = () => {
           <Typography variant="body2">
             <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted or altered once deployed. We hold no liability for any content you create or deploy. Always test thoroughly on{' '}
             <Link
-              href="https://zeroart.app/zerocontract/ghost/"
+              href="https://zeroart.app/tezos/zerocontract/ghost/index.html"
               color="primary"
               underline="hover"
               target="_blank"

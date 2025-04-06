@@ -46,8 +46,8 @@ export default function Header() {
   const handleNetworkChange = (e) =>
     (window.location.href =
       e.target.value === 'ghostnet'
-        ? 'https://zeroart.app/zerocontract/ghost'
-        : 'https://zeroart.app/zerocontract');
+        ? 'https://zeroart.app/tezos/zerocontract/ghost/index.html'
+        : 'https://zeroart.app/tezos/zerocontract/index.html');
 
   const toggleDrawer = (open) => () => setDrawerOpen(open);
 
