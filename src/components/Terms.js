@@ -34,7 +34,7 @@ const Terms = () => (
             On Tezos, contracts are immutable and cannot be altered once
             deployed. Always test thoroughly on&nbsp;
             <Link
-              href="https://zeroart.app/tezos/zerocontract/ghost/index.html"
+              href="https://ghostnet.savetheworldwithart.io"
               target="_blank"
               rel="noopener noreferrer"
             >
