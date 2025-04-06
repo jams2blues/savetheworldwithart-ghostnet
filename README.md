@@ -1,17 +1,17 @@
 <!--
   Developed by @jams2blues with love for the Tezos community
   File: README.md
-  Summary: GitHub front‑page for ZeroArt (Ghostnet branch)
+  Summary: GitHub front‑page for ZeroArt (Mainnet branch)
 -->
 
 <p align="center">
   <img src="public/images/logo.svg" alt="ZeroArt logo" width="90"/>
 </p>
 
-<h1 align="center">ZeroArt NFT Platform (Ghostnet)</h1>
+<h1 align="center">ZeroArt NFT Platform (Mainnet)</h1>
 
 > **ZeroArt** is a 100 % on‑chain, no‑code NFT deployment & interaction  
-> platform for the Tezos blockchain. This branch targets **Ghostnet**  
+> platform for the Tezos blockchain. This branch targets **Mainnet**  
 > (testnet).  For mainnet, see the `mainnet` branch (coming soon).
 
 ---
@@ -53,7 +53,7 @@ yarn install
 yarn dev          # http://localhost:3000
 ```
 
-> **Note:** No `.env` files are required—RPC endpoints are hard‑coded for Ghostnet.
+> **Note:** No `.env` files are required—RPC endpoints are hard‑coded for Mainnet.
 
 ---
 
