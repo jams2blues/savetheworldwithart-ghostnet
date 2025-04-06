@@ -1,96 +1,46 @@
 // src/components/Home.js
-
+/* this app was developed by @jams2blues with love for the Tezos community */
 import React from 'react';
-import styled from 'styled-components';
-import { Typography, Container, Button, Grid, Box } from '@mui/material';
-import { Link } from 'react-router-dom';
-import { ReactComponent as Logo } from '../logo.svg'; // Adjust the path if necessary
+import { Container, Typography, Button, Box, Grid } from '@mui/material';
+import Link from 'next/link';
+import { styled } from '@mui/material/styles';
 
-// Styled Container with responsive padding
-const StyledContainer = styled(Container)`
-  padding: 40px 20px;
-  margin: 20px auto;
-  max-width: 800px;
-`;
+// Styled Logo component using logo.svg from public/images
+const Logo = styled('img')({
+  width: '80px',
+  height: '80px',
+  marginBottom: '16px',
+});
 
 const Home = () => {
   return (
-    <StyledContainer maxWidth="lg">
-      <Grid
-        container
-        spacing={4}
-        alignItems="center"
-        justifyContent="center"
-        direction="column" // Set direction to 'column' for all screen sizes
-      >
-        {/* Welcome Text */}
-        <Grid item xs={12}>
-          <Box
-            sx={{
-              textAlign: 'center',
-              maxWidth: '800px', // Adjust as needed for your design
-              margin: '0 auto',
-            }}
-          >
-            <Typography
-              variant="h3"
-              gutterBottom
-              sx={{ fontSize: { xs: '2rem', md: '3rem' } }}
-            >
-              Welcome to ZeroContract
-            </Typography>
-            <Typography
-              variant="h6"
-              gutterBottom
-              sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}
-            >
-              Empowering artists to create and manage their own on-chain Tezos NFTs effortlessly.
-            </Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              component={Link}
-              to="/generate"
-              sx={{
-                mt: 3,
-                px: { xs: 3, md: 6 },
-                py: { xs: 1, md: 2 },
-                fontSize: { xs: '0.8rem', md: '1rem' },
-                borderRadius: '20px',
-                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                '&:hover': {
-                  boxShadow: '0 6px 25px rgba(0, 0, 0, 0.2)',
-                },
-              }}
-            >
-              Get Started
+    <Container sx={{ textAlign: 'center', py: 5 }}>
+      <Box sx={{ mb: 4 }}>
+        <Logo src="/images/logo.svg" alt="ZeroArt Logo" />
+        <Typography variant="h3" sx={{ mb: 2 }}>
+          Welcome to The Zero Contract
+        </Typography>
+        <Typography variant="h6" sx={{ mb: 4 }}>
+          Empowering artists to create and manage their own on-chain Tezos NFTs effortlessly.
+        </Typography>
+      </Box>
+      <Grid container spacing={2} justifyContent="center">
+        <Grid>
+          <Link href="/generate" passHref legacyBehavior>
+            <Button variant="contained" color="info" sx={{ px: 3, py: 2 }}>
+              Deploy Contract
             </Button>
-          </Box>
+          </Link>
         </Grid>
-
-        {/* Logo Image */}
-        <Grid item xs={12}>
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'center', // Center the logo
-              alignItems: 'center',
-              width: '100%',
-            }}
-          >
-            <Box
-              component={Logo}
-              alt="ZeroContract Logo"
-              sx={{
-                width: { xs: '80%', sm: '60%', md: '50%' },
-                maxWidth: '400px',
-                height: 'auto',
-              }}
-            />
-          </Box>
+        <Grid>
+          <Link href="/mint-burn-transfer" passHref legacyBehavior>
+            <Button variant="outlined" color="secondary" sx={{ px: 3, py: 2 }}>
+              Mint/Burn/Transfer
+            </Button>
+          </Link>
         </Grid>
       </Grid>
-    </StyledContainer>
+    </Container>
   );
 };
 

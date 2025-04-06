@@ -1,5 +1,7 @@
-// src/components/Header.js
-
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/Header.js
+  Summary: Header with responsive wallet‑button text so it never overflows.
+*/
 import React, { useContext, useState } from 'react';
 import {
   AppBar,
@@ -8,141 +10,127 @@ import {
   Button,
   IconButton,
   Drawer,
-  List,
   ListItemButton,
   ListItemText,
-  Snackbar,
-  Alert,
   Box,
+  useMediaQuery,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from '@mui/material';
-import { Link } from 'react-router-dom';
-import styled from 'styled-components';
-import { WalletContext } from '../contexts/WalletContext';
-import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import { styled, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
-import { ReactComponent as Logo } from '../logo.svg';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import Link from 'next/link';
+import { WalletContext } from '../contexts/WalletContext';
 
-const StyledLink = styled(Link)`
-  text-decoration: none;
-  color: inherit;
-  margin-right: 15px;
-`;
+const Logo = styled('img')({ width: 40, height: 40, marginRight: 8 });
+const HeaderContainer = styled(AppBar)`background-color: darkgreen;`;
 
-const Header = () => {
-  const {
-    walletAddress,
-    isWalletConnected,
-    connectWallet,
-    disconnectWallet,
-  } = useContext(WalletContext);
-
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+export default function Header() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { walletAddress, isWalletConnected, connectWallet, disconnectWallet, network } =
+    useContext(WalletContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  const toggleDrawer = (open) => () => {
-    setDrawerOpen(open);
-  };
 
   const menuItems = [
     { text: 'Home', link: '/' },
-    { text: 'Generate Contract', link: '/generate' },
+    { text: 'Deploy Contract', link: '/generate' },
     { text: 'Mint/Burn/Transfer', link: '/mint-burn-transfer' },
-    { text: 'On-Chain NFT License 2.0', link: '/on-chain-license' },
+    { text: 'On‑Chain License', link: '/on-chain-license' },
+    { text: 'Terms', link: '/terms' },
   ];
+
+  const handleNetworkChange = (e) =>
+    (window.location.href =
+      e.target.value === 'ghostnet'
+        ? 'https://zeroart.app/zerocontract/ghost'
+        : 'https://zeroart.app/zerocontract');
+
+  const toggleDrawer = (open) => () => setDrawerOpen(open);
+
+  const walletLabel = () =>
+    !isWalletConnected
+      ? isMobile
+        ? 'Connect'
+        : 'Connect Wallet'
+      : isMobile
+      ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+      : `Disconnect (${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)})`;
+
+  const walletAction = isWalletConnected ? disconnectWallet : connectWallet;
 
   return (
     <>
-      <AppBar position="static" sx={{ backgroundColor: 'darkgreen' }}>
+      <HeaderContainer position="static">
         <Toolbar>
-          {/* Hamburger Menu for Mobile */}
-          <Box sx={{ display: { xs: 'block', sm: 'none' }, mr: 2 }}>
-            <IconButton
-              edge="start"
-              color="inherit"
-              aria-label="menu"
-              onClick={toggleDrawer(true)}
-            >
+          {isMobile && (
+            <IconButton color="inherit" edge="start" onClick={toggleDrawer(true)}>
               <MenuIcon />
             </IconButton>
-            <Drawer
-              anchor="left"
-              open={drawerOpen}
-              onClose={toggleDrawer(false)}
-            >
-              <Box
-                sx={{ width: 250 }}
-                role="presentation"
-                onClick={toggleDrawer(false)}
-                onKeyDown={toggleDrawer(false)}
-              >
-                <List>
-                  {menuItems.map((item) => (
-                    <ListItemButton
-                      key={item.text}
-                      component={Link}
-                      to={item.link}
-                    >
-                      <ListItemText primary={item.text} />
-                    </ListItemButton>
-                  ))}
-                </List>
-              </Box>
-            </Drawer>
-          </Box>
+          )}
 
-          {/* Logo */}
-          <Link to="/">
-            <Logo style={{ height: '40px', width: '40px', marginRight: '15px' }} />
+          <Link href="/" legacyBehavior passHref>
+            <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <Logo src="/images/logo.svg" alt="ZeroArt Logo" />
+              <Typography variant="h6" component="a" sx={{ color: '#fff', textDecoration: 'none' }}>
+                ZeroArtApp
+              </Typography>
+            </Box>
           </Link>
 
-          {/* Title */}
-          <Typography variant="h6" sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }}>
-            ZeroContract Beta
-          </Typography>
+          {!isMobile && (
+            <Box sx={{ flexGrow: 1, ml: 2 }}>
+              {menuItems.map((i) => (
+                <Link key={i.text} href={i.link} legacyBehavior passHref>
+                  <Button sx={{ color: '#fff', ml: 1 }}>{i.text}</Button>
+                </Link>
+              ))}
+            </Box>
+          )}
 
-          {/* Navigation Links for Desktop */}
-          <Box sx={{ display: { xs: 'none', sm: 'block' }, flexGrow: 1 }}>
-            {menuItems.map((item) => (
-              <StyledLink key={item.text} to={item.link}>
-                <Button color="inherit">{item.text}</Button>
-              </StyledLink>
-            ))}
+          {/* network selector */}
+          <Box sx={{ ml: 'auto', mr: 2 }}>
+            <FormControl variant="standard" sx={{ minWidth: 90 }}>
+              <InputLabel sx={{ color: '#fff' }}>Network</InputLabel>
+              <Select
+                value={network}
+                onChange={handleNetworkChange}
+                label="Network"
+                sx={{ color: '#fff' }}
+              >
+                <MenuItem value="mainnet">Mainnet</MenuItem>
+                <MenuItem value="ghostnet">Ghostnet</MenuItem>
+              </Select>
+            </FormControl>
           </Box>
 
-          {/* Wallet Connection Button */}
-          {!isWalletConnected ? (
-            <Button color="inherit" onClick={connectWallet} startIcon={<AccountBalanceWalletIcon />}>
-              Connect Wallet
-            </Button>
-          ) : (
-            <Button color="inherit" onClick={disconnectWallet} startIcon={<AccountBalanceWalletIcon />}>
-              Disconnect ({walletAddress.substring(0, 6)}...{walletAddress.slice(-4)})
-            </Button>
-          )}
+          {/* wallet button */}
+          <Button
+            color="inherit"
+            onClick={walletAction}
+            startIcon={<AccountBalanceWalletIcon />}
+            sx={{ whiteSpace: 'nowrap', px: isMobile ? 1 : 2 }}
+          >
+            {walletLabel()}
+          </Button>
         </Toolbar>
-      </AppBar>
+      </HeaderContainer>
 
-      {/* Snackbar for Notifications */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={handleCloseSnackbar}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      {/* mobile drawer */}
+      <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
+        <Box sx={{ width: 250 }} onClick={toggleDrawer(false)} onKeyDown={toggleDrawer(false)}>
+          {menuItems.map((i) => (
+            <Link key={i.text} href={i.link} legacyBehavior passHref>
+              <ListItemButton>
+                <ListItemText primary={i.text} />
+              </ListItemButton>
+            </Link>
+          ))}
+        </Box>
+      </Drawer>
     </>
   );
-};
-
-export default Header;
+}

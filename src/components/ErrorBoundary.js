@@ -1,5 +1,5 @@
 // src/components/ErrorBoundary.js
-
+/* this app was developed by @jams2blues with love for the Tezos community */
 import React from 'react';
 import { Alert, AlertTitle } from '@mui/material';
 

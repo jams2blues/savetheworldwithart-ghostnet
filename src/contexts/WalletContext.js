@@ -1,162 +1,176 @@
 // src/contexts/WalletContext.js
-
-import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
-import { BeaconWallet } from '@taquito/beacon-wallet';
+/* this app was developed by @jams2blues with love for the Tezos community */
+import React, { createContext, useState, useEffect } from 'react';
 import { TezosToolkit } from '@taquito/taquito';
+import { BeaconWallet } from '@taquito/beacon-wallet';
+import { BeaconEvent } from '@airgap/beacon-sdk';
 import { NETWORKS } from '../config/networkConfig';
 
-// Create the Wallet Context
+/*
+  Patch matrixClient methods to ignore "Syncing stopped manually" errors
+  (Carried over from earlier versions to handle Beacon quirks).
+*/
+if (typeof BeaconWallet !== 'undefined' && BeaconWallet.prototype) {
+  const clientProto = BeaconWallet.prototype.client?.constructor?.prototype;
+  if (clientProto) {
+    const originalPollSync = clientProto.pollSync;
+    clientProto.pollSync = async function (...args) {
+      try {
+        await originalPollSync.apply(this, args);
+      } catch (error) {
+        if (error.message && error.message.includes("Syncing stopped manually")) {
+          console.warn("Ignored pollSync error:", error.message);
+        } else {
+          throw error;
+        }
+      }
+    };
+
+    const originalDestroy = clientProto.destroy;
+    clientProto.destroy = async function (...args) {
+      try {
+        return await originalDestroy.apply(this, args);
+      } catch (error) {
+        if (error.message && error.message.includes("Syncing stopped manually")) {
+          console.warn("Ignored destroy error:", error.message);
+        } else {
+          throw error;
+        }
+      }
+    };
+  }
+}
+
 export const WalletContext = createContext();
 
-// Wallet Provider Component
 export const WalletProvider = ({ children }) => {
+  /**
+   * Simply change this line to "mainnet" for your mainnet build:
+   * const defaultNetwork = 'mainnet';
+   */
+  const defaultNetwork = 'ghostnet';
+
+  // Retrieve matching RPC from your config
+  const networkConfig = NETWORKS[defaultNetwork];
+
+  const [tezos, setTezos] = useState(null);
+  const [wallet, setWallet] = useState(null);
   const [walletAddress, setWalletAddress] = useState('');
   const [isWalletConnected, setIsWalletConnected] = useState(false);
-  const [tezos, setTezos] = useState(null);
 
-  // Using ref to store BeaconWallet instance to prevent multiple instances
-  const beaconWalletRef = useRef(null);
-
-  // Initialize BeaconWallet and TezosToolkit on mount
   useEffect(() => {
-    const initializeWallet = async () => {
-      try {
-        console.log('Initializing wallet for network: ghostnet');
-        const networkConfig = NETWORKS['ghostnet'];
+    const initWallet = async () => {
+      // Clear any active account on re-init, if a wallet instance already exists
+      if (wallet) {
+        try {
+          await wallet.clearActiveAccount();
+        } catch (error) {
+          console.warn('Error clearing active account during reinitialization:', error.message);
+        }
+      }
 
-        // Initialize BeaconWallet only if not already initialized
-        if (!beaconWalletRef.current) {
-          const beaconWallet = new BeaconWallet({
-            name: 'SaveTheWorldWithArt.io',
-            preferredNetwork: networkConfig.type,
-            disableDefaultEvents: false, // Enable wallet selection
-            enableLogging: true, // Enables logging for debugging
-          });
+      const rpcURL = networkConfig.rpcUrl;
+      const newTezos = new TezosToolkit(rpcURL);
+      const newWallet = new BeaconWallet({
+        name: 'ZeroArt DApp',
+        preferredNetwork: networkConfig.type,
+      });
 
-          beaconWalletRef.current = beaconWallet;
+      newTezos.setWalletProvider(newWallet);
 
-          // Initialize Tezos Toolkit with the selected network's RPC
-          const tezosToolkit = new TezosToolkit(networkConfig.rpcUrl);
-          tezosToolkit.setWalletProvider(beaconWallet);
-
-          setTezos(tezosToolkit);
-
-          console.log('BeaconWallet and TezosToolkit initialized successfully.');
-
-          // Check for active account
-          const activeAccount = await beaconWallet.client.getActiveAccount();
-          if (activeAccount) {
-            console.log('Active account found during initialization:', activeAccount);
-            setWalletAddress(activeAccount.address);
-            setIsWalletConnected(true);
-          } else {
-            console.log('No active account found during initialization.');
-          }
+      // Listen for changes to the active account
+      newWallet.client.subscribeToEvent(BeaconEvent.ACTIVE_ACCOUNT_SET, async (account) => {
+        if (account) {
+          const address = await newWallet.getPKH();
+          setWalletAddress(address);
+          setIsWalletConnected(true);
+          console.log(`Active account set: ${address} on ${defaultNetwork}`);
         } else {
-          console.log('BeaconWallet already initialized for the current network.');
+          setWalletAddress('');
+          setIsWalletConnected(false);
+          console.log('Wallet disconnected');
         }
-      } catch (error) {
-        console.error('Error initializing wallet:', error);
+      });
+
+      // Check for a persisted active account
+      const activeAccount = await newWallet.client.getActiveAccount();
+      if (activeAccount) {
+        const address = await newWallet.getPKH();
+        setWalletAddress(address);
+        setIsWalletConnected(true);
+        console.log('Active account found during initialization:', activeAccount);
+      } else {
+        console.log('No active account found during initialization.');
       }
+
+      setTezos(newTezos);
+      setWallet(newWallet);
     };
 
-    initializeWallet();
-  }, []);
+    initWallet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultNetwork]);
 
-  // Connect Wallet Function
-  const connectWallet = useCallback(async () => {
-    const beaconWallet = beaconWalletRef.current;
-    if (!beaconWallet) {
-      console.warn('BeaconWallet is not initialized.');
-      return;
-    }
-
+  const connectWallet = async () => {
+    if (!wallet) return;
     try {
-      console.log('Attempting to connect wallet...');
-      const activeAccount = await beaconWallet.client.getActiveAccount();
-      console.log('Active account fetched:', activeAccount);
-
-      if (!activeAccount) {
-        console.log('No active account found. Requesting permissions...');
-        await beaconWallet.requestPermissions();
-        console.log('Permissions requested.');
-      }
-
-      const userAddress = await beaconWallet.getPKH();
-      setWalletAddress(userAddress);
+      console.log('Connecting wallet...');
+      await wallet.requestPermissions({
+        network: { type: networkConfig.type },
+      });
+      const address = await wallet.getPKH();
+      setWalletAddress(address);
       setIsWalletConnected(true);
-      console.log(`Wallet connected: ${userAddress}`);
-    } catch (error) {
-      console.error('Wallet Connection Error:', error);
-      // Optionally, you can set error state here to inform the user
-    }
-  }, []);
-
-  // Disconnect Wallet Function
-  const disconnectWallet = useCallback(async () => {
-    const beaconWallet = beaconWalletRef.current;
-    if (!beaconWallet) {
-      console.warn('BeaconWallet is not initialized.');
-      return;
-    }
-
-    try {
-      console.log('Disconnecting wallet...');
-      await beaconWallet.clearActiveAccount();
-      setWalletAddress('');
-      setIsWalletConnected(false);
-      console.log('Wallet disconnected successfully.');
-    } catch (error) {
-      console.error('Wallet Disconnection Error:', error);
-      // Optionally, you can set error state here to inform the user
-    }
-  }, []);
-
-  // Polling for Account Changes (Optional but useful for multi-account scenarios)
-  useEffect(() => {
-    let interval = null;
-
-    const checkActiveAccount = async () => {
-      const beaconWallet = beaconWalletRef.current;
-      if (!beaconWallet || !isWalletConnected) return;
-
-      try {
-        const userAddress = await beaconWallet.getPKH();
-        if (userAddress && userAddress !== walletAddress) {
-          console.log(`Active account updated: ${userAddress}`);
-          setWalletAddress(userAddress);
+      console.log(`Wallet connected: ${address} on ${defaultNetwork}`);
+    } catch (err) {
+      if (err?.message?.includes("Proposal expired")) {
+        // Graceful handling for timed-out wallet connection
+        alert("Your connection session expired. Please try connecting again.");
+        // Optionally reset state, log out, or re-init the wallet here
+        console.warn("Proposal expired:", err);
+      } else if (err?.message?.includes("Secret seed not found")) {
+        console.error("Secret seed not found; reinitializing wallet...");
+        try {
+          await wallet.clearActiveAccount();
+        } catch (destroyErr) {
+          console.warn("Error clearing active account:", destroyErr);
         }
-      } catch (error) {
-        console.error('Error checking active account:', error);
+        setWalletAddress("");
+        setIsWalletConnected(false);
+      } else {
+        console.error("Wallet connection failed:", err);
       }
-    };
-
-    if (isWalletConnected) {
-      // Initial check
-      checkActiveAccount();
-
-      // Polling: Check every 5 seconds
-      interval = setInterval(() => {
-        checkActiveAccount();
-      }, 5000);
     }
+  };  
 
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isWalletConnected, walletAddress]);
+  const disconnectWallet = async () => {
+    if (!wallet) return;
+    try {
+      await wallet.clearActiveAccount();
+      console.log('Wallet cleared active account.');
+    } catch (error) {
+      console.warn('Error during disconnect:', error.message);
+    }
+    setWalletAddress('');
+    setIsWalletConnected(false);
+    console.log('Wallet manually disconnected');
+  };
 
   return (
     <WalletContext.Provider
       value={{
+        tezos,
+        wallet,
         walletAddress,
         isWalletConnected,
+        network: defaultNetwork, // Provided for the Header selector
         connectWallet,
         disconnectWallet,
-        tezos,
       }}
     >
       {children}
     </WalletContext.Provider>
   );
 };
+
+export default WalletProvider;

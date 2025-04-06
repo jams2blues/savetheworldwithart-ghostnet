@@ -1,0 +1,38 @@
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/styles/globals.css
+  Summary: Global reset + mobile fixes for Beacon modal & page padding
+*/
+html,body{
+  margin:0;
+  padding:0;
+  min-height:100%;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Fira Sans','Droid Sans','Helvetica Neue',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  overflow-x:hidden;               /* kill horizontal scroll on narrow screens */
+  background:#fafafa;              /* light neutral bg to hide “letter‑boxing” */
+}
+code{
+  font-family:source-code-pro,Menlo,Monaco,Consolas,'Courier New',monospace;
+}
+
+/* ─── Beacon modal – hard‑cap width/height & lock background scroll ─── */
+.beacon-modal__wrapper,
+.beacon-modal__container{
+  max-width:95vw!important;
+  max-height:95vh!important;
+  overflow:auto!important;
+  border-radius:12px!important;
+}
+html.beacon-modal__open,
+body.beacon-modal__open{overflow:hidden}
+
+/* ─── Generic page containers (Generate / Mint / Terms) ─── */
+.MuiPaper-root,
+.MuiContainer-root{
+  padding-left:16px!important;
+  padding-right:16px!important;
+}
+@media(max-width:600px){
+  .MuiContainer-root{padding-left:8px!important;padding-right:8px!important}
+}
