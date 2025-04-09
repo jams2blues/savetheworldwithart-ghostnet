@@ -21,7 +21,7 @@ const Home = () => {
           Welcome to The Zero Contract
         </Typography>
         <Typography variant="h6" sx={{ mb: 4 }}>
-          Empowering artists to create and manage their own on-chain Tezos NFTs effortlessly.
+          Empowering artists to create and manage their own on-chain Tezos NFTs effortlessly. On Ghostnet (tezos testnet)
         </Typography>
       </Box>
       <Grid container spacing={2} justifyContent="center">
