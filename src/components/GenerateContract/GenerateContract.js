@@ -1,6 +1,7 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract‑generation guard and a deployment popup that shows only the deployed KT1 address for copying.
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with form validation, fee estimation and deployment.
+           After deployment, a popup displays the deployed KT1 address with a copy button that uses a unified, focus‑safe clipboard copy handler.
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -36,7 +37,7 @@ import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
 
-/*──────────────────────── Styled Containers ─────────────────────────*/
+/* Styled Containers */
 const Container = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
@@ -60,7 +61,7 @@ const Pre = styled('pre')`
   font-size: 0.9rem;
 `;
 
-/*──────────────────────── Helper Functions ─────────────────────────*/
+/* Helper Functions */
 const stringToHex = (str) =>
   [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 
@@ -83,9 +84,8 @@ const getByteSize = (dataUri) => {
 
 /**
  * Robust helper to copy text to the clipboard.
- * It first queries for the "clipboard-write" permission (if available)
- * and uses navigator.clipboard.writeText; falls back to document.execCommand('copy').
- * This version is focused so that focus traps in Dialogs do not interfere.
+ * It first tries navigator.clipboard.writeText.
+ * Then it falls back to using a temporary textarea with document.execCommand('copy').
  */
 const copyToClipboard = async (text) => {
   try {
@@ -116,7 +116,7 @@ const copyToClipboard = async (text) => {
   }
 };
 
-/*──────────────────────── Constants & Builders ─────────────────────────*/
+/* Constants & Storage Builder */
 const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 const CONTENT_KEY = 'content';
@@ -140,7 +140,7 @@ const getV3Storage = (walletAddress, metadataMap) => ({
   total_supply: new MichelsonMap(),
 });
 
-/*──────────────────────── Component ─────────────────────────*/
+/* Component */
 const GenerateContract = () => {
   const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
   const [formData, setFormData] = useState({
@@ -167,12 +167,16 @@ const GenerateContract = () => {
   const [estimatedStorageLimit, setEstimatedStorageLimit] = useState(null);
   const [estimatedBalanceChangeTez, setEstimatedBalanceChangeTez] = useState(null);
 
+  // Note: The deployed contract address (KT1) is stored in contractAddress.
+  // We use the same copy handler in both the Step 2 section and the popup.
+  const [kt1, setKt1] = useState('');
+
   const supportedFiletypesList = [
     'image/bmp','image/gif','image/jpeg','image/png','image/apng','image/svg+xml','image/webp',
     'video/mp4','video/ogg','video/quicktime','video/webm','text/plain','application/json'
   ];
 
-  // Fetch Michelson code (once wallet is connected)
+  // Fetch Michelson code once wallet is connected
   useEffect(() => {
     const fetchMichelson = async () => {
       try {
@@ -306,7 +310,7 @@ const GenerateContract = () => {
     setFormErrors((prev) => ({ ...prev, imageUri: err }));
   };
 
-  // Generate contract only if form valid and Michelson code exists.
+  // Generate contract by setting modifiedMichelsonCode, but do not throw if Michelson is not ready
   useEffect(() => {
     const generateContract = async () => {
       if (!validateForm()) {
@@ -329,7 +333,7 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  // Popup copy handler (calls same copy helper as bottom page)
+  // Popup copy handler: uses copyToClipboard to copy the deployed KT1 address.
   const handlePopupCopy = async () => {
     if (!contractAddress) return;
     const ok = await copyToClipboard(contractAddress);
@@ -440,7 +444,7 @@ const GenerateContract = () => {
     }
   };
 
-  // Confirm deployment and show the Contract Details Popup
+  // Confirm deployment and show Contract Details Popup
   const confirmDeployment = async () => {
     setConfirmDialog({ open: false, data: null });
     setDeploying(true);
@@ -478,6 +482,10 @@ const GenerateContract = () => {
       if (deployedAddress) {
         setContractAddress(deployedAddress);
         setSnackbar({ open: true, message: `Contract deployed at ${deployedAddress}`, severity: 'success' });
+        // Use the same KT1 address in both places.
+        setConfirmDialog({ open: false, data: null });
+        setDeploying(false);
+        // Open the popup dialog.
         setContractDetailsDialogOpen(true);
       } else {
         setSnackbar({ open: true, message: 'Failed to retrieve contract address.', severity: 'error' });
@@ -807,8 +815,7 @@ const GenerateContract = () => {
               underline="hover"
             >
               OBJKT.com
-            </Link>
-            .
+            </Link>.
           </Typography>
         </Section>
       )}
@@ -879,6 +886,8 @@ const GenerateContract = () => {
         onClose={handleCloseContractDetailsDialog}
         fullWidth
         maxWidth="sm"
+        disableEnforceFocus
+        disableAutoFocus
       >
         <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
