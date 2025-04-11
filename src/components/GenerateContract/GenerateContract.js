@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only). Includes form validation, fee estimation, deployment, and a popup with the deployed KT1 address for copying.
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract‑generation guard and a deployment popup that shows only the deployed KT1 address for copying.
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -36,6 +36,7 @@ import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
 
+/*──────────────────────── Styled Containers ─────────────────────────*/
 const Container = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
@@ -49,7 +50,7 @@ const Section = styled('div')`
   margin-bottom: 30px;
 `;
 
-const Preformatted = styled('pre')`
+const Pre = styled('pre')`
   background-color: #f5f5f5;
   padding: 10px;
   max-height: 300px;
@@ -59,6 +60,7 @@ const Preformatted = styled('pre')`
   font-size: 0.9rem;
 `;
 
+/*──────────────────────── Helper Functions ─────────────────────────*/
 const stringToHex = (str) =>
   [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 
@@ -82,7 +84,8 @@ const getByteSize = (dataUri) => {
 /**
  * Robust helper to copy text to the clipboard.
  * It first queries for the "clipboard-write" permission (if available)
- * and uses navigator.clipboard.writeText, falling back to document.execCommand('copy').
+ * and uses navigator.clipboard.writeText; falls back to document.execCommand('copy').
+ * This version is focused so that focus traps in Dialogs do not interfere.
  */
 const copyToClipboard = async (text) => {
   try {
@@ -113,6 +116,7 @@ const copyToClipboard = async (text) => {
   }
 };
 
+/*──────────────────────── Constants & Builders ─────────────────────────*/
 const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 const CONTENT_KEY = 'content';
@@ -136,6 +140,7 @@ const getV3Storage = (walletAddress, metadataMap) => ({
   total_supply: new MichelsonMap(),
 });
 
+/*──────────────────────── Component ─────────────────────────*/
 const GenerateContract = () => {
   const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
   const [formData, setFormData] = useState({
@@ -209,7 +214,7 @@ const GenerateContract = () => {
     setFormErrors((prev) => ({ ...prev, [name]: error }));
   };
 
-  // Build metadata preview using current formData (with defaults)
+  // Build metadata preview using formData
   const metadataPreview = useMemo(() => ({
     name: formData.name || "",
     description: formData.description || "",
@@ -222,14 +227,14 @@ const GenerateContract = () => {
     imageUri: formData.imageUri || "",
   }), [formData]);
 
-  // Compute live metadata size including fixed overhead
+  // Compute live metadata size
   const metadataSize = useMemo(() => {
     const metadataJson = JSON.stringify(metadataPreview);
     const metadataHex = stringToHex(metadataJson);
     return metadataHex.length / 2 + OVERHEAD_BYTES;
   }, [metadataPreview]);
 
-  // Render live metadata size indicator above the FileUpload button
+  // Render metadata size indicator
   const renderMetadataSizeIndicator = () => (
     <Typography variant="body2" sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
       Estimated Metadata Size: {Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
@@ -301,8 +306,7 @@ const GenerateContract = () => {
     setFormErrors((prev) => ({ ...prev, imageUri: err }));
   };
 
-  // Generate contract by setting modifiedMichelsonCode (only if form is valid).
-  // Instead of throwing an error when michelsonCode is not set, we log a warning and return.
+  // Generate contract only if form valid and Michelson code exists.
   useEffect(() => {
     const generateContract = async () => {
       if (!validateForm()) {
@@ -325,7 +329,7 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  // Popup copy handler for the deployed KT1 address
+  // Popup copy handler (calls same copy helper as bottom page)
   const handlePopupCopy = async () => {
     if (!contractAddress) return;
     const ok = await copyToClipboard(contractAddress);
@@ -767,7 +771,7 @@ const GenerateContract = () => {
           <Typography variant="body2" gutterBottom>
             Your contract has been successfully deployed. Below is your contract address.
           </Typography>
-          <Preformatted>{contractAddress}</Preformatted>
+          <Pre>{contractAddress}</Pre>
           <Button
             variant="contained"
             color="secondary"
@@ -803,7 +807,8 @@ const GenerateContract = () => {
               underline="hover"
             >
               OBJKT.com
-            </Link>.
+            </Link>
+            .
           </Typography>
         </Section>
       )}
@@ -880,13 +885,9 @@ const GenerateContract = () => {
           <DialogContentText>
             Your contract has been successfully deployed. Please copy your contract address and store it safely.
           </DialogContentText>
-          <Preformatted>{contractAddress}</Preformatted>
-          <Box sx={{ mt: 1, mb: 1 }}>
-            <Button
-              variant="outlined"
-              onClick={handlePopupCopy}
-              sx={{ maxWidth: '300px', mx: 'auto' }}
-            >
+          <Pre>{contractAddress}</Pre>
+          <Box sx={{ textAlign: 'center', my: 2 }}>
+            <Button variant="outlined" onClick={handlePopupCopy} sx={{ maxWidth: '300px', mx: 'auto' }}>
               Copy Contract Address
             </Button>
           </Box>
