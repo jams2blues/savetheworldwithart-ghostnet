@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract-generation guard and a simplified deployment popup that shows only the contract address for copying.
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract-generation guard; popup displays only the deployed KT1 address for copying.
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -36,7 +36,7 @@ import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
 
-/*───────────────────────── Styled Containers ─────────────────────────*/
+/*──────────────────────── Styled Containers ───────────────────────*/
 const Container = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
@@ -60,7 +60,7 @@ const Preformatted = styled('pre')`
   font-size: 0.9rem;
 `;
 
-/*───────────────────────── Helper Functions ─────────────────────────*/
+/*──────────────────────── Helper Functions ─────────────────────────*/
 const stringToHex = (str) =>
   [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 
@@ -83,8 +83,8 @@ const getByteSize = (dataUri) => {
 
 /**
  * Robust helper to copy text to the clipboard.
- * It queries for the "clipboard-write" permission and uses navigator.clipboard.writeText when permitted,
- * otherwise falls back to document.execCommand('copy').
+ * It first queries the "clipboard-write" permission (if available) and uses navigator.clipboard.writeText.
+ * Falls back to document.execCommand('copy') if necessary.
  */
 const copyToClipboard = async (text) => {
   try {
@@ -115,16 +115,14 @@ const copyToClipboard = async (text) => {
   }
 };
 
-/*───────────────────────── Constants & Builders ─────────────────────────*/
+/*──────────────────────── Constants & Builders ─────────────────────────*/
 const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 const CONTENT_KEY = 'content';
 const STORAGE_COST_PER_BYTE = 0.00025;
-
-// Fixed overhead added to metadata size (in bytes)
 const OVERHEAD_BYTES = 5960;
+const MAX_METADATA_SIZE = 32768; // This constant is now defined at module scope
 
-// V3 contract storage builder
 const getV3Storage = (walletAddress, metadataMap) => ({
   admin: walletAddress,
   all_tokens: 0,
@@ -141,7 +139,7 @@ const getV3Storage = (walletAddress, metadataMap) => ({
   total_supply: new MichelsonMap(),
 });
 
-/*───────────────────────── Component ─────────────────────────*/
+/*──────────────────────── Component ─────────────────────────*/
 const GenerateContract = () => {
   const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
   const [formData, setFormData] = useState({
@@ -327,8 +325,10 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  // Remove advanced "Copy Contract" button from main page; only using copy of KT1 address in the popup.
-  // handleDeployContract remains unchanged.
+  // We removed the advanced "Copy Contract"/"Copy Contract Code" buttons; no changes on page.
+  // The only copy function available is in the popup, which copies the deployed KT1 address.
+
+  // Handle deployment; note that fee estimation and origination may take time due to network latency
   const handleDeployContract = async () => {
     if (!validateForm()) {
       setSnackbar({ open: true, message: 'Fix errors before deploying.', severity: 'error' });
@@ -383,7 +383,7 @@ const GenerateContract = () => {
 
       const originationEstimation = await tezos.estimate.originate({
         code: modifiedMichelsonCode,
-        storage: storage,
+        storage,
       });
       const feeMutez = originationEstimation.suggestedFeeMutez;
       const gasLimit = originationEstimation.gasLimit;
@@ -420,7 +420,7 @@ const GenerateContract = () => {
       });
     } catch (error) {
       console.error('Fee estimation error:', error);
-      if (error.message && error.message.includes("Oversized operation")) {
+      if (error.message && error.message.includes('Oversized operation')) {
         setSnackbar({ open: true, message: 'Error: Operation size exceeds maximum allowed. Please reduce metadata size.', severity: 'error' });
       } else {
         setSnackbar({ open: true, message: 'Error estimating fees. Please try again.', severity: 'error' });
@@ -429,7 +429,7 @@ const GenerateContract = () => {
     }
   };
 
-  // Confirm deployment and show the Contract Details Popup
+  // Confirm deployment and then show a popup with full contract details. The popup now only shows the deployed KT1 address.
   const confirmDeployment = async () => {
     setConfirmDialog({ open: false, data: null });
     setDeploying(true);
@@ -457,7 +457,7 @@ const GenerateContract = () => {
 
       const originationOp = await tezos.wallet.originate({
         code: modifiedMichelsonCode,
-        storage: storage,
+        storage,
       }).send();
 
       setSnackbar({ open: true, message: 'Awaiting confirmation...', severity: 'info' });
@@ -467,7 +467,6 @@ const GenerateContract = () => {
       if (deployedAddress) {
         setContractAddress(deployedAddress);
         setSnackbar({ open: true, message: `Contract deployed at ${deployedAddress}`, severity: 'success' });
-        // Updated popup text: we now show only the contract address with a copy button.
         setContractDetailsDialogOpen(true);
       } else {
         setSnackbar({ open: true, message: 'Failed to retrieve contract address.', severity: 'error' });
@@ -723,13 +722,14 @@ const GenerateContract = () => {
 
       {metadataPreview && (
         <Section>
-          <Typography variant="subtitle1" gutterBottom>Metadata Preview:</Typography>
+          <Typography variant="subtitle1" gutterBottom>
+            Metadata Preview:
+          </Typography>
           <NFTPreview metadata={metadataPreview} />
         </Section>
       )}
 
       <Grid container spacing={2} sx={{ textAlign: 'center', mt: 2 }}>
-        {/* Removed advanced "Copy Contract" section */}
         <Grid size={12}>
           <Typography variant="caption" display="block" gutterBottom>
             Get your collection on-chain so you can start minting!
@@ -754,7 +754,9 @@ const GenerateContract = () => {
 
       {contractAddress && (
         <Section>
-          <Typography variant="h6" gutterBottom>Step 2: Your Contract is Deployed</Typography>
+          <Typography variant="h6" gutterBottom>
+            Step 2: Your Contract is Deployed
+          </Typography>
           <Typography variant="body2" gutterBottom>
             Your contract has been successfully deployed. Below is your contract address.
           </Typography>
@@ -776,26 +778,13 @@ const GenerateContract = () => {
           </Button>
           <Typography variant="body2" sx={{ mt: 1 }}>
             Check your contract on{' '}
-            <Link
-              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
-              target="_blank"
-              rel="noopener noreferrer"
-              color="primary"
-              underline="hover"
-            >
+            <Link href={`https://better-call.dev/ghostnet/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" color="primary" underline="hover">
               Better Call Dev
             </Link>{' '}
             or{' '}
-            <Link
-              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              color="primary"
-              underline="hover"
-            >
+            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" color="primary" underline="hover">
               OBJKT.com
-            </Link>
-            .
+            </Link>.
           </Typography>
         </Section>
       )}
@@ -919,7 +908,6 @@ const GenerateContract = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Global Snackbar */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
