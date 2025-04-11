@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract‑generation guard and a deployment popup that shows only the deployed KT1 address for copying.
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only). Includes form validation, fee estimation, deployment, and a popup with the deployed KT1 address for copying.
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -81,8 +81,8 @@ const getByteSize = (dataUri) => {
 
 /**
  * Robust helper to copy text to the clipboard.
- * It first queries for the "clipboard-write" permission (if available) and uses navigator.clipboard.writeText.
- * Falls back to document.execCommand('copy') if necessary.
+ * It first queries for the "clipboard-write" permission (if available)
+ * and uses navigator.clipboard.writeText, falling back to document.execCommand('copy').
  */
 const copyToClipboard = async (text) => {
   try {
@@ -301,15 +301,19 @@ const GenerateContract = () => {
     setFormErrors((prev) => ({ ...prev, imageUri: err }));
   };
 
-  // Generate contract by setting modifiedMichelsonCode (only if form is valid)
+  // Generate contract by setting modifiedMichelsonCode (only if form is valid).
+  // Instead of throwing an error when michelsonCode is not set, we log a warning and return.
   useEffect(() => {
     const generateContract = async () => {
       if (!validateForm()) {
         setModifiedMichelsonCode('');
         return;
       }
+      if (!michelsonCode) {
+        console.warn('Michelson code not set yet; skipping contract generation.');
+        return;
+      }
       try {
-        if (!michelsonCode) throw new Error('Michelson code not set.');
         setModifiedMichelsonCode(michelsonCode);
         setSnackbar({ open: true, message: 'Contract generated.', severity: 'success' });
       } catch (error) {
@@ -321,8 +325,7 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  // This button (at the bottom of the page) for copying KT1 address works fine.
-  // In the Contract Details Popup below, we define a named handler to ensure it fires.
+  // Popup copy handler for the deployed KT1 address
   const handlePopupCopy = async () => {
     if (!contractAddress) return;
     const ok = await copyToClipboard(contractAddress);
@@ -333,7 +336,7 @@ const GenerateContract = () => {
     });
   };
 
-  // Handle contract deployment
+  // Handle deployment
   const handleDeployContract = async () => {
     if (!validateForm()) {
       setSnackbar({ open: true, message: 'Fix errors before deploying.', severity: 'error' });
@@ -433,7 +436,7 @@ const GenerateContract = () => {
     }
   };
 
-  // Confirm deployment and then show the Contract Details Popup
+  // Confirm deployment and show the Contract Details Popup
   const confirmDeployment = async () => {
     setConfirmDialog({ open: false, data: null });
     setDeploying(true);
