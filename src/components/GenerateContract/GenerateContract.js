@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with resilient clipboard and safe contract-generation guard
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with resilient clipboard and safe contract-generation guard that checks Clipboard permissions
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -78,29 +78,37 @@ const getByteSize = (dataUri) => {
 };
 
 /**
- * Attempts to copy text to clipboard using the Clipboard API.
- * Falls back to document.execCommand if necessary.
- * Returns true on success, false otherwise.
+ * Enhanced copyToClipboard helper:
+ * - Uses the Permissions API to check for "clipboard-write" permission.
+ * - If permission is granted or promptable, attempts navigator.clipboard.writeText.
+ * - Otherwise falls back to document.execCommand('copy').
  */
 const copyToClipboard = async (text) => {
   try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch (err) {
-    try {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.focus();
-      textarea.select();
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      return successful;
-    } catch (execErr) {
-      return false;
+    if (navigator.permissions && navigator.permissions.query) {
+      const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
+      // If permission is granted or promptable, use Clipboard API
+      if (state === 'granted' || state === 'prompt') {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
     }
+  } catch (permErr) {
+    // Permissions API may not be supported or an error occurred; fall through to fallback
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return successful;
+  } catch (execErr) {
+    return false;
   }
 };
 
@@ -158,7 +166,7 @@ const GenerateContract = () => {
     'video/mp4','video/ogg','video/quicktime','video/webm','text/plain','application/json'
   ];
 
-  // Fetch Michelson code once wallet is connected
+  // Fetch Michelson code (once wallet is connected)
   useEffect(() => {
     const fetchMichelson = async () => {
       try {
@@ -220,7 +228,6 @@ const GenerateContract = () => {
     return metadataHex.length / 2 + OVERHEAD_BYTES;
   }, [metadataPreview]);
 
-  // Maximum allowed metadata size (hard limit)
   // Render live metadata size indicator above the FileUpload button
   const renderMetadataSizeIndicator = () => (
     <Typography variant="body2" sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
@@ -843,7 +850,7 @@ const GenerateContract = () => {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={contractDetailsDialogOpen} onClose={handleCloseContractDetailsDialog} fullWidth maxWidth="sm">
+      <Dialog open={contractDetailsDialogOpen} onClose={() => setContractDetailsDialogOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
           <DialogContentText>
@@ -868,7 +875,7 @@ const GenerateContract = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseContractDetailsDialog} color="primary">
+          <Button onClick={() => setContractDetailsDialogOpen(false)} color="primary">
             Close
           </Button>
         </DialogActions>
@@ -877,10 +884,10 @@ const GenerateContract = () => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
