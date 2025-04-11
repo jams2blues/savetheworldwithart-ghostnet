@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with resilient clipboard and safe contract-generation guard that checks Clipboard permissions
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with resilient clipboard and safe contract-generation guard that verifies clipboard contents
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -80,21 +80,26 @@ const getByteSize = (dataUri) => {
 /**
  * Enhanced copyToClipboard helper:
  * - Uses the Permissions API to check for "clipboard-write" permission.
- * - If permission is granted or promptable, attempts navigator.clipboard.writeText.
- * - Otherwise falls back to document.execCommand('copy').
+ * - Attempts navigator.clipboard.writeText when permitted.
+ * - Falls back to document.execCommand('copy') if necessary.
+ * - If possible, reads back the clipboard contents to verify the copy.
  */
 const copyToClipboard = async (text) => {
   try {
     if (navigator.permissions && navigator.permissions.query) {
       const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
-      // If permission is granted or promptable, use Clipboard API
       if (state === 'granted' || state === 'prompt') {
         await navigator.clipboard.writeText(text);
+        if (navigator.clipboard.readText) {
+          const copied = await navigator.clipboard.readText();
+          if (copied === text) return true;
+          else throw new Error('Verification failed');
+        }
         return true;
       }
     }
   } catch (permErr) {
-    // Permissions API may not be supported or an error occurred; fall through to fallback
+    console.warn('Clipboard API error:', permErr);
   }
   try {
     const textarea = document.createElement('textarea');
@@ -106,8 +111,17 @@ const copyToClipboard = async (text) => {
     textarea.select();
     const successful = document.execCommand('copy');
     document.body.removeChild(textarea);
+    if (navigator.clipboard.readText) {
+      try {
+        const copiedFallback = await navigator.clipboard.readText();
+        if (copiedFallback === text) return true;
+      } catch (readErr) {
+        // Fallback verification not available
+      }
+    }
     return successful;
   } catch (execErr) {
+    console.error('Fallback clipboard error:', execErr);
     return false;
   }
 };
@@ -166,7 +180,7 @@ const GenerateContract = () => {
     'video/mp4','video/ogg','video/quicktime','video/webm','text/plain','application/json'
   ];
 
-  // Fetch Michelson code (once wallet is connected)
+  // Fetch Michelson code once wallet is connected
   useEffect(() => {
     const fetchMichelson = async () => {
       try {
