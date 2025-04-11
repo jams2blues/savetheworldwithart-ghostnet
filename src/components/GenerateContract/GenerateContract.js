@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: Deploy‑contract form (V3) – now with iframe‑safe clipboard fallback
+  Summary: Deploy‑contract form (V3) – now with iframe‑safe clipboard fallback and Michelson code fetch guard
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -296,8 +296,12 @@ const GenerateContract = () => {
         setModifiedMichelsonCode('');
         return;
       }
+      // Guard: if Michelson code hasn't been fetched yet, don't proceed.
+      if (!michelsonCode) {
+        console.warn("Michelson code not set yet, skipping contract generation.");
+        return;
+      }
       try {
-        if (!michelsonCode) throw new Error('Michelson code not set.');
         setModifiedMichelsonCode(michelsonCode);
         setSnackbar({ open: true, message: 'Contract generated.', severity: 'success' });
       } catch (error) {
