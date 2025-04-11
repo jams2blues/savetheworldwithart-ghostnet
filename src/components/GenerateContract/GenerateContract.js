@@ -1,7 +1,7 @@
-// src/components/GenerateContract/GenerateContract.js
-// Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only). 
-// Includes form validation, fee estimation, deployment, and a popup with full contract details and links.
-// (Developed by @jams2blues with love for the Tezos community)
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/GenerateContract/GenerateContract.js
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with resilient clipboard and safe contract-generation guard
+*/
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
 import {
@@ -76,6 +76,40 @@ const getByteSize = (dataUri) => {
   } catch (error) {
     console.error('Error calculating byte size:', error);
     return 0;
+  }
+};
+
+/**
+ * A robust helper to copy text to the clipboard.
+ * It first queries the "clipboard-write" permission (if available) and tries navigator.clipboard.writeText.
+ * If that fails, it falls back to the execCommand method.
+ */
+const copyToClipboard = async (text) => {
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
+      if (state === 'granted' || state === 'prompt') {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    }
+  } catch (permErr) {
+    console.warn('Clipboard API permissions error:', permErr);
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return successful;
+  } catch (execErr) {
+    console.error('Fallback clipboard error:', execErr);
+    return false;
   }
 };
 
@@ -294,17 +328,17 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  const handleCopyContract = () => {
+  const handleCopyContract = async () => {
     if (!modifiedMichelsonCode) {
       setSnackbar({ open: true, message: 'Generate contract first.', severity: 'warning' });
       return;
     }
-    navigator.clipboard.writeText(modifiedMichelsonCode)
-      .then(() => setSnackbar({ open: true, message: 'Contract copied!', severity: 'success' }))
-      .catch((err) => {
-        console.error('Copy failed:', err);
-        setSnackbar({ open: true, message: 'Failed to copy contract.', severity: 'error' });
-      });
+    const success = await copyToClipboard(modifiedMichelsonCode);
+    setSnackbar({
+      open: true,
+      message: success ? 'Contract copied!' : 'Failed to copy contract.',
+      severity: success ? 'success' : 'error',
+    });
   };
 
   // Handle deployment; note that fee estimation and origination may take some time due to network latency
@@ -446,7 +480,7 @@ const GenerateContract = () => {
       if (deployedAddress) {
         setContractAddress(deployedAddress);
         setSnackbar({ open: true, message: `Contract deployed at ${deployedAddress}`, severity: 'success' });
-        // Instead of the old dialog, open our new Contract Details popup:
+        // Open the Contract Details popup:
         setContractDetailsDialogOpen(true);
       } else {
         setSnackbar({ open: true, message: 'Failed to retrieve contract address.', severity: 'error' });
@@ -856,10 +890,10 @@ const GenerateContract = () => {
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>
