@@ -1,6 +1,6 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract-generation guard; popup displays only the deployed KT1 address for copying.
+  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with a safe contract‑generation guard and a deployment popup that shows only the deployed KT1 address for copying.
 */
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
@@ -36,7 +36,6 @@ import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
 
-/*──────────────────────── Styled Containers ───────────────────────*/
 const Container = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
@@ -60,7 +59,6 @@ const Preformatted = styled('pre')`
   font-size: 0.9rem;
 `;
 
-/*──────────────────────── Helper Functions ─────────────────────────*/
 const stringToHex = (str) =>
   [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 
@@ -83,7 +81,7 @@ const getByteSize = (dataUri) => {
 
 /**
  * Robust helper to copy text to the clipboard.
- * It first queries the "clipboard-write" permission (if available) and uses navigator.clipboard.writeText.
+ * It first queries for the "clipboard-write" permission (if available) and uses navigator.clipboard.writeText.
  * Falls back to document.execCommand('copy') if necessary.
  */
 const copyToClipboard = async (text) => {
@@ -115,13 +113,12 @@ const copyToClipboard = async (text) => {
   }
 };
 
-/*──────────────────────── Constants & Builders ─────────────────────────*/
 const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 const CONTENT_KEY = 'content';
 const STORAGE_COST_PER_BYTE = 0.00025;
 const OVERHEAD_BYTES = 5960;
-const MAX_METADATA_SIZE = 32768; // This constant is now defined at module scope
+const MAX_METADATA_SIZE = 32768;
 
 const getV3Storage = (walletAddress, metadataMap) => ({
   admin: walletAddress,
@@ -139,7 +136,6 @@ const getV3Storage = (walletAddress, metadataMap) => ({
   total_supply: new MichelsonMap(),
 });
 
-/*──────────────────────── Component ─────────────────────────*/
 const GenerateContract = () => {
   const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
   const [formData, setFormData] = useState({
@@ -325,10 +321,19 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  // We removed the advanced "Copy Contract"/"Copy Contract Code" buttons; no changes on page.
-  // The only copy function available is in the popup, which copies the deployed KT1 address.
+  // This button (at the bottom of the page) for copying KT1 address works fine.
+  // In the Contract Details Popup below, we define a named handler to ensure it fires.
+  const handlePopupCopy = async () => {
+    if (!contractAddress) return;
+    const ok = await copyToClipboard(contractAddress);
+    setSnackbar({
+      open: true,
+      message: ok ? 'Contract address copied!' : 'Failed to copy address.',
+      severity: ok ? 'success' : 'error',
+    });
+  };
 
-  // Handle deployment; note that fee estimation and origination may take time due to network latency
+  // Handle contract deployment
   const handleDeployContract = async () => {
     if (!validateForm()) {
       setSnackbar({ open: true, message: 'Fix errors before deploying.', severity: 'error' });
@@ -406,7 +411,6 @@ const GenerateContract = () => {
         setDeploying(false);
         return;
       }
-      // Open the confirmation dialog with fee estimations
       setConfirmDialog({
         open: true,
         data: {
@@ -420,7 +424,7 @@ const GenerateContract = () => {
       });
     } catch (error) {
       console.error('Fee estimation error:', error);
-      if (error.message && error.message.includes('Oversized operation')) {
+      if (error.message && error.message.includes("Oversized operation")) {
         setSnackbar({ open: true, message: 'Error: Operation size exceeds maximum allowed. Please reduce metadata size.', severity: 'error' });
       } else {
         setSnackbar({ open: true, message: 'Error estimating fees. Please try again.', severity: 'error' });
@@ -429,7 +433,7 @@ const GenerateContract = () => {
     }
   };
 
-  // Confirm deployment and then show a popup with full contract details. The popup now only shows the deployed KT1 address.
+  // Confirm deployment and then show the Contract Details Popup
   const confirmDeployment = async () => {
     setConfirmDialog({ open: false, data: null });
     setDeploying(true);
@@ -778,18 +782,29 @@ const GenerateContract = () => {
           </Button>
           <Typography variant="body2" sx={{ mt: 1 }}>
             Check your contract on{' '}
-            <Link href={`https://better-call.dev/ghostnet/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" color="primary" underline="hover">
+            <Link
+              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
+              target="_blank"
+              rel="noopener noreferrer"
+              color="primary"
+              underline="hover"
+            >
               Better Call Dev
             </Link>{' '}
             or{' '}
-            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" color="primary" underline="hover">
+            <Link
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              color="primary"
+              underline="hover"
+            >
               OBJKT.com
             </Link>.
           </Typography>
         </Section>
       )}
 
-      {/* Confirmation Dialog */}
       <Dialog
         open={confirmDialog.open}
         onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
@@ -851,7 +866,6 @@ const GenerateContract = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Contract Details Popup */}
       <Dialog
         open={contractDetailsDialogOpen}
         onClose={handleCloseContractDetailsDialog}
@@ -867,14 +881,7 @@ const GenerateContract = () => {
           <Box sx={{ mt: 1, mb: 1 }}>
             <Button
               variant="outlined"
-              onClick={async () => {
-                const ok = await copyToClipboard(contractAddress);
-                setSnackbar({
-                  open: true,
-                  message: ok ? 'Contract address copied!' : 'Failed to copy address.',
-                  severity: ok ? 'success' : 'error',
-                });
-              }}
+              onClick={handlePopupCopy}
               sx={{ maxWidth: '300px', mx: 'auto' }}
             >
               Copy Contract Address
