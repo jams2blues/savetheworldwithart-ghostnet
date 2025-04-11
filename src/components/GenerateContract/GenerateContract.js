@@ -1,7 +1,7 @@
-// src/components/GenerateContract/GenerateContract.js
-// Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only). 
-// Includes form validation, fee estimation, deployment, and a popup with full contract details and links.
-// (Developed by @jams2blues with love for the Tezos community)
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/GenerateContract/GenerateContract.js
+  Summary: Deploy‑contract form (V3) – now with iframe‑safe clipboard fallback
+*/
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
 import {
@@ -62,10 +62,8 @@ const Preformatted = styled('pre')`
 const stringToHex = (str) =>
   [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
 
-const isValidTezosAddress = (address) => {
-  const regex = /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/;
-  return regex.test(address);
-};
+const isValidTezosAddress = (address) =>
+  /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
 
 const getByteSize = (dataUri) => {
   try {
@@ -83,11 +81,9 @@ const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 const CONTENT_KEY = 'content';
 const STORAGE_COST_PER_BYTE = 0.00025;
-
-// Fixed overhead added to metadata size (in bytes)
 const OVERHEAD_BYTES = 5960;
+const MAX_METADATA_SIZE = 32768;
 
-// V3 contract storage builder
 const getV3Storage = (walletAddress, metadataMap) => ({
   admin: walletAddress,
   all_tokens: 0,
@@ -103,6 +99,33 @@ const getV3Storage = (walletAddress, metadataMap) => ({
   token_metadata: new MichelsonMap(),
   total_supply: new MichelsonMap(),
 });
+
+/**
+ * Attempts to copy text to clipboard using the modern Clipboard API.
+ * Falls back to document.execCommand if necessary.
+ * Returns a boolean indicating success.
+ */
+const copyToClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return successful;
+    } catch (execErr) {
+      return false;
+    }
+  }
+};
 
 const GenerateContract = () => {
   const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
@@ -136,7 +159,6 @@ const GenerateContract = () => {
     'video/mp4','video/ogg','video/quicktime','video/webm','text/plain','application/json'
   ];
 
-  // Fetch Michelson code (once wallet is connected)
   useEffect(() => {
     const fetchMichelson = async () => {
       try {
@@ -178,7 +200,6 @@ const GenerateContract = () => {
     setFormErrors((prev) => ({ ...prev, [name]: error }));
   };
 
-  // Build metadata preview using current formData (with defaults)
   const metadataPreview = useMemo(() => ({
     name: formData.name || "",
     description: formData.description || "",
@@ -191,17 +212,12 @@ const GenerateContract = () => {
     imageUri: formData.imageUri || "",
   }), [formData]);
 
-  // Compute live metadata size including fixed overhead
   const metadataSize = useMemo(() => {
     const metadataJson = JSON.stringify(metadataPreview);
     const metadataHex = stringToHex(metadataJson);
     return metadataHex.length / 2 + OVERHEAD_BYTES;
   }, [metadataPreview]);
 
-  // Maximum allowed metadata size (hard limit)
-  const MAX_METADATA_SIZE = 32768;
-
-  // Render live metadata size indicator above the FileUpload button
   const renderMetadataSizeIndicator = () => (
     <Typography variant="body2" sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
       Estimated Metadata Size: {Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
@@ -274,7 +290,6 @@ const GenerateContract = () => {
     setFormErrors((prev) => ({ ...prev, imageUri: err }));
   };
 
-  // Generate contract by setting modifiedMichelsonCode (only if form is valid)
   useEffect(() => {
     const generateContract = async () => {
       if (!validateForm()) {
@@ -294,20 +309,15 @@ const GenerateContract = () => {
     generateContract();
   }, [formData, michelsonCode]);
 
-  const handleCopyContract = () => {
+  const handleCopyContract = async () => {
     if (!modifiedMichelsonCode) {
       setSnackbar({ open: true, message: 'Generate contract first.', severity: 'warning' });
       return;
     }
-    navigator.clipboard.writeText(modifiedMichelsonCode)
-      .then(() => setSnackbar({ open: true, message: 'Contract copied!', severity: 'success' }))
-      .catch((err) => {
-        console.error('Copy failed:', err);
-        setSnackbar({ open: true, message: 'Failed to copy contract.', severity: 'error' });
-      });
+    const success = await copyToClipboard(modifiedMichelsonCode);
+    setSnackbar({ open: true, message: success ? 'Contract copied!' : 'Failed to copy contract.', severity: success ? 'success' : 'error' });
   };
 
-  // Handle deployment; note that fee estimation and origination may take some time due to network latency
   const handleDeployContract = async () => {
     if (!validateForm()) {
       setSnackbar({ open: true, message: 'Fix errors before deploying.', severity: 'error' });
@@ -385,7 +395,6 @@ const GenerateContract = () => {
         setDeploying(false);
         return;
       }
-      // Open the confirmation dialog with fee estimations
       setConfirmDialog({
         open: true,
         data: {
@@ -408,7 +417,6 @@ const GenerateContract = () => {
     }
   };
 
-  // Confirm deployment and then show a popup with full contract details and links
   const confirmDeployment = async () => {
     setConfirmDialog({ open: false, data: null });
     setDeploying(true);
@@ -446,7 +454,6 @@ const GenerateContract = () => {
       if (deployedAddress) {
         setContractAddress(deployedAddress);
         setSnackbar({ open: true, message: `Contract deployed at ${deployedAddress}`, severity: 'success' });
-        // Instead of the old dialog, open our new Contract Details popup:
         setContractDetailsDialogOpen(true);
       } else {
         setSnackbar({ open: true, message: 'Failed to retrieve contract address.', severity: 'error' });
@@ -519,7 +526,6 @@ const GenerateContract = () => {
         for the late nights – powered by sheer willpower and love.
       </Typography>
 
-      {/* Liability Disclaimer */}
       <Section>
         <Alert severity="warning">
           <Typography variant="body2">
@@ -538,7 +544,6 @@ const GenerateContract = () => {
         </Alert>
       </Section>
 
-      {/* Wallet Connection Status */}
       <Box sx={{ textAlign: 'center', mb: 2 }}>
         {isWalletConnected ? (
           <Typography variant="subtitle1">Wallet Connected: {walletAddress}</Typography>
@@ -547,7 +552,6 @@ const GenerateContract = () => {
         )}
       </Box>
 
-      {/* Step 1: Fill Contract Details */}
       <Section>
         <Typography variant="h6" gutterBottom>
           Step 1: Fill in Your Collection Details
@@ -662,7 +666,6 @@ const GenerateContract = () => {
                 )}
               </FormControl>
             </Grid>
-            {/* Render live metadata size indicator above the FileUpload button */}
             <Grid size={12}>
               {renderMetadataSizeIndicator()}
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -754,7 +757,7 @@ const GenerateContract = () => {
             Your contract has been successfully deployed. Below is your contract address.
           </Typography>
           <Preformatted>{contractAddress}</Preformatted>
-          <Button variant="contained" color="secondary" onClick={() => navigator.clipboard.writeText(contractAddress)} sx={{ mt: 1, maxWidth: '300px', mx: 'auto' }}>
+          <Button variant="contained" color="secondary" onClick={async () => await copyToClipboard(contractAddress)} sx={{ mt: 1, maxWidth: '300px', mx: 'auto' }}>
             Copy Contract Address
           </Button>
           <Typography variant="body2" sx={{ mt: 1 }}>
@@ -770,7 +773,6 @@ const GenerateContract = () => {
         </Section>
       )}
 
-      {/* Confirmation Dialog */}
       <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ ...confirmDialog, open: false })} fullWidth maxWidth="sm">
         <DialogTitle id="confirm-deployment-title">Confirm Deployment</DialogTitle>
         <DialogContent>
@@ -821,7 +823,6 @@ const GenerateContract = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Contract Details Popup */}
       <Dialog open={contractDetailsDialogOpen} onClose={handleCloseContractDetailsDialog} fullWidth maxWidth="sm">
         <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
