@@ -1,7 +1,7 @@
-/*Developed by @jams2blues with love for the Tezos community
-  File: src/components/MintBurnTransfer/Mint.js
-  Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
-           The NFT description field now allows up to 5000 characters.
+/* Developed by @jams2blues with love for the Tezos community
+   File: src/components/MintBurnTransfer/Mint.js
+   Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
+            The NFT description field now allows up to 5000 characters.
 */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -45,15 +45,25 @@ const MAX_TAG_LENGTH = 20;
 const TAG_REGEX = /^[a-zA-Z0-9-_]+$/;
 const MAX_ROYALTIES = 25;
 const STORAGE_COST_PER_BYTE = 0.00025;
-// Set overhead to 360 bytes to account for extra encoding overhead as determined in testing.
+// Overhead bytes determined in testing
 const OVERHEAD_BYTES = 360;
 
 const ON_CHAIN_LICENSE = "On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z";
-
 const MAX_METADATA_SIZE = 32768;
 
 const Section = styled.div`
   margin-top: 20px;
+`;
+
+// Define Pre as a styled "pre" element for consistent formatting
+const Pre = styled('pre')`
+  background-color: #f5f5f5;
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-size: 0.9rem;
 `;
 
 const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
@@ -78,7 +88,6 @@ const copyToClipboard = async (text) => {
       const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
       if (state === 'granted' || state === 'prompt') {
         await navigator.clipboard.writeText(text);
-        // Always run fallback as backup because of focus issues in iframes.
       }
     }
   } catch (permErr) {
@@ -125,7 +134,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const [loading, setLoading] = useState(false);
   const [estimation, setEstimation] = useState({});
   const [dialog, setDialog] = useState({ open: false });
-  const [contractDetailsDialogOpen, setContractDetailsDialogOpen] = useState(false); // Added state to fix error
+  const [contractDetailsDialogOpen, setContractDetailsDialogOpen] = useState(false);
+  // mintedAddress can be used to capture the contract address after minting if needed.
   const [mintedAddress, setMintedAddress] = useState('');
 
   const snack = (msg, severity = 'warning') =>
