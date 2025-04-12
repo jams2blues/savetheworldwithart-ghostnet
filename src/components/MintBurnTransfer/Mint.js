@@ -1,7 +1,7 @@
-/* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/Mint.js
-   Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
-            The NFT description field now allows up to 5000 characters.
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/MintBurnTransfer/Mint.js
+  Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
+           The NFT description field now allows up to 5000 characters.
 */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -45,7 +45,7 @@ const MAX_TAG_LENGTH = 20;
 const TAG_REGEX = /^[a-zA-Z0-9-_]+$/;
 const MAX_ROYALTIES = 25;
 const STORAGE_COST_PER_BYTE = 0.00025;
-// Overhead bytes determined in testing
+// Overhead bytes as determined in testing (360 bytes)
 const OVERHEAD_BYTES = 360;
 
 const ON_CHAIN_LICENSE = "On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z";
@@ -55,7 +55,7 @@ const Section = styled.div`
   margin-top: 20px;
 `;
 
-// Define Pre as a styled "pre" element for consistent formatting
+// Preformatted text styling for metadata preview
 const Pre = styled('pre')`
   background-color: #f5f5f5;
   padding: 10px;
@@ -82,34 +82,6 @@ const approximateMetadataSize = (map) => {
   return total + OVERHEAD_BYTES;
 };
 
-const copyToClipboard = async (text) => {
-  try {
-    if (navigator.permissions && navigator.permissions.query) {
-      const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
-      if (state === 'granted' || state === 'prompt') {
-        await navigator.clipboard.writeText(text);
-      }
-    }
-  } catch (permErr) {
-    console.warn('Clipboard permission error:', permErr);
-  }
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const successful = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return successful;
-  } catch (execErr) {
-    console.error('Fallback copy error:', execErr);
-    return false;
-  }
-};
-
 const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -130,13 +102,11 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
   const tagInputRef = useRef(null);
+
   const [metadataSize, setMetadataSize] = useState(0);
   const [loading, setLoading] = useState(false);
   const [estimation, setEstimation] = useState({});
   const [dialog, setDialog] = useState({ open: false });
-  const [contractDetailsDialogOpen, setContractDetailsDialogOpen] = useState(false);
-  // mintedAddress can be used to capture the contract address after minting if needed.
-  const [mintedAddress, setMintedAddress] = useState('');
 
   const snack = (msg, severity = 'warning') =>
     setSnackbar({ open: true, message: msg, severity });
@@ -356,8 +326,12 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           : contract.methods.mint(parseInt(formData.amount, 10), map, formData.toAddress);
       const params = await op.toTransferParams();
       const est = await tezos.estimate.transfer(params);
-      const feeTez = new BigNumber(est.suggestedFeeMutez).dividedBy(1e6).toFixed(6);
-      const storageTez = new BigNumber(est.storageLimit).times(STORAGE_COST_PER_BYTE).toFixed(6);
+      const feeTez = new BigNumber(est.suggestedFeeMutez)
+        .dividedBy(1e6)
+        .toFixed(6);
+      const storageTez = new BigNumber(est.storageLimit)
+        .times(STORAGE_COST_PER_BYTE)
+        .toFixed(6);
       const totalTez = new BigNumber(feeTez).plus(storageTez).toFixed(6);
       const obj = {
         estimatedFeeTez: feeTez,
@@ -459,8 +433,13 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         </Grid>
 
         <Grid size={12}>
-          <Typography variant="body1">Artifact File (≤20KB recommended)</Typography>
-          <MintUpload onFileChange={handleFileChange} onFileDataUrlChange={handleFileDataUrlChange} />
+          <Typography variant="body1">
+            Artifact File (≤20 KB recommended)
+          </Typography>
+          <MintUpload
+            onFileChange={handleFileChange}
+            onFileDataUrlChange={handleFileDataUrlChange}
+          />
         </Grid>
 
         {artifactDataUrl && (
@@ -515,8 +494,12 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               label="License *"
             >
               <MenuItem value="">Select a License</MenuItem>
-              <MenuItem value="CC0 (Public Domain)">CC0 (Public Domain)</MenuItem>
-              <MenuItem value="All Rights Reserved">All Rights Reserved</MenuItem>
+              <MenuItem value="CC0 (Public Domain)">
+                CC0 (Public Domain)
+              </MenuItem>
+              <MenuItem value="All Rights Reserved">
+                All Rights Reserved
+              </MenuItem>
               <MenuItem value={ON_CHAIN_LICENSE}>{ON_CHAIN_LICENSE}</MenuItem>
               <MenuItem value="CC BY 4.0">CC BY 4.0</MenuItem>
               <MenuItem value="CC BY-SA 4.0">CC BY‑SA 4.0</MenuItem>
@@ -559,8 +542,12 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               onChange={handleInputChange}
               label="NSFW Content"
             >
-              <MenuItem value="Does not contain NSFW">Does not contain NSFW</MenuItem>
-              <MenuItem value="Does contain NSFW">Does contain NSFW</MenuItem>
+              <MenuItem value="Does not contain NSFW">
+                Does not contain NSFW
+              </MenuItem>
+              <MenuItem value="Does contain NSFW">
+                Does contain NSFW
+              </MenuItem>
             </Select>
           </FormControl>
           <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
@@ -577,12 +564,20 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               onChange={handleInputChange}
               label="Flashing Hazards"
             >
-              <MenuItem value="Does not contain Flashing Hazard">Does not contain Flashing Hazard</MenuItem>
-              <MenuItem value="Does contain Flashing Hazard">Does contain Flashing Hazard</MenuItem>
+              <MenuItem value="Does not contain Flashing Hazard">
+                Does not contain Flashing Hazard
+              </MenuItem>
+              <MenuItem value="Does contain Flashing Hazard">
+                Does contain Flashing Hazard
+              </MenuItem>
             </Select>
           </FormControl>
           <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-            <Link href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value" target="_blank" rel="noopener noreferrer">
+            <Link
+              href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               Learn more
             </Link>
           </Typography>
@@ -626,7 +621,9 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         </Grid>
 
         <Grid size={12}>
-          <Typography variant="body1">Tags * (enter comma or press Enter to add)</Typography>
+          <Typography variant="body1">
+            Tags * (enter comma or press Enter to add)
+          </Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
             {tags.map((t) => (
               <Chip
@@ -706,13 +703,16 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       <Section>
         <Typography variant="subtitle2" sx={{ marginTop: 10 }}>
           Approx. Metadata Size: {Math.floor(metadataSize).toLocaleString()} / {MAX_METADATA_SIZE} bytes{' '}
-          <Tooltip title="This is the estimated total metadata size (including a fixed overhead of 360 bytes) that will be stored on-chain. The hard limit is 32,768 bytes." arrow>
+          <Tooltip
+            title="This is the estimated total metadata size (including a fixed overhead of 360 bytes) that will be stored on-chain. The hard limit is 32,768 bytes."
+            arrow
+          >
             <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
           </Tooltip>
         </Typography>
         {metadataSize > MAX_METADATA_SIZE && (
           <Typography variant="body2" color="error">
-            Warning: Metadata size exceeds the maximum allowed 32 KB. Minting is disabled.
+            Warning: Metadata size exceeds the maximum allowed 32 KB. Minting is disabled.
           </Typography>
         )}
       </Section>
@@ -811,11 +811,19 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Your contract has been successfully deployed. Please copy your contract address and store it safely.
+            Your contract has been successfully deployed. Please copy your contract address
+            and store it safely.
           </DialogContentText>
           <Pre>{contractAddress}</Pre>
           <Box sx={{ textAlign: 'center', my: 2 }}>
-            <Button variant="outlined" onClick={handlePopupCopy} sx={{ maxWidth: '300px', mx: 'auto' }}>
+            <Button variant="outlined" onClick={async () => {
+              const ok = await copyToClipboard(contractAddress);
+              setSnackbar({
+                open: true,
+                message: ok ? 'Contract address copied!' : 'Failed to copy address.',
+                severity: ok ? 'success' : 'error',
+              });
+            }} sx={{ maxWidth: '300px', mx: 'auto' }}>
               Copy Contract Address
             </Button>
           </Box>
@@ -848,13 +856,13 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       </Dialog>
 
       <Snackbar
-        open={snackbar.open}
+        open={setSnackbar.open || false}
         autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        onClose={() => setSnackbar({ open: false, message: '', severity: 'info' })}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
+        <Alert onClose={() => setSnackbar({ open: false, message: '', severity: 'info' })} severity={setSnackbar.severity || 'info'} sx={{ width: '100%' }}>
+          {setSnackbar.message}
         </Alert>
       </Snackbar>
     </div>
