@@ -1,6 +1,7 @@
-/* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/Mint.js
-   Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/MintBurnTransfer/Mint.js
+  Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
+           The NFT description field now allows up to 5000 characters.
 */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -46,20 +47,21 @@ const MAX_ROYALTIES = 25;
 const STORAGE_COST_PER_BYTE = 0.00025;
 // Set overhead to 360 bytes to account for extra encoding overhead as determined in testing.
 const OVERHEAD_BYTES = 360;
-
 const ON_CHAIN_LICENSE = "On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z";
-
 const MAX_METADATA_SIZE = 32768;
 
 const Section = styled.div`
   margin-top: 20px;
 `;
 
+// Convert string to hex using Buffer
 const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
 
+// Tezos address validation
 const isValidTezosAddress = (addr) =>
   /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
 
+// Estimate metadata size from MichelsonMap entries
 const approximateMetadataSize = (map) => {
   let total = 0;
   for (const [k, v] of map.entries()) {
@@ -69,6 +71,40 @@ const approximateMetadataSize = (map) => {
     else total += Buffer.byteLength(v, 'utf8');
   }
   return total + OVERHEAD_BYTES;
+};
+
+/**
+ * Robust helper to copy text to the clipboard.
+ * It first tries navigator.clipboard.writeText; if that fails (or in case of focus issues inside an iframe dialog),
+ * it falls back to using a temporary textarea and document.execCommand('copy').
+ */
+const copyToClipboard = async (text) => {
+  try {
+    if (navigator.permissions && navigator.permissions.query) {
+      const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
+      if (state === 'granted' || state === 'prompt') {
+        await navigator.clipboard.writeText(text);
+        // Always run fallback as a backup due to focus traps in Dialogs
+      }
+    }
+  } catch (permErr) {
+    console.warn('Clipboard permission error:', permErr);
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    return successful;
+  } catch (execErr) {
+    console.error('Fallback copy error:', execErr);
+    return false;
+  }
 };
 
 const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
@@ -91,11 +127,13 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
   const tagInputRef = useRef(null);
-
   const [metadataSize, setMetadataSize] = useState(0);
   const [loading, setLoading] = useState(false);
   const [estimation, setEstimation] = useState({});
   const [dialog, setDialog] = useState({ open: false });
+  
+  // For minted NFT address response. OBJKT uses KT1 addresses.
+  const [mintedAddress, setMintedAddress] = useState('');
 
   const snack = (msg, severity = 'warning') =>
     setSnackbar({ open: true, message: msg, severity });
@@ -181,10 +219,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     m.set('name', '0x' + stringToHex(formData.name));
     m.set('description', '0x' + stringToHex(formData.description));
     m.set('artifactUri', '0x' + stringToHex(artifactDataUrl || ''));
-    m.set(
-      'creators',
-      '0x' + stringToHex(JSON.stringify(formData.creators.split(',').map((c) => c.trim())))
-    );
+    m.set('creators', '0x' + stringToHex(JSON.stringify(formData.creators.split(',').map((c) => c.trim()))));
     if (formData.license) {
       const rights = formData.license === 'Custom' ? formData.customLicense : formData.license;
       if (rights.trim()) m.set('rights', '0x' + stringToHex(rights));
@@ -192,10 +227,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     m.set('decimals', '0x' + stringToHex('0'));
     if (artifactFile?.type) m.set('mimeType', '0x' + stringToHex(artifactFile.type));
     const r = parseFloat(formData.royalties || '0');
-    m.set(
-      'royalties',
-      '0x' + stringToHex(JSON.stringify({ decimals: 4, shares: { [formData.toAddress]: Math.round(r * 100) } }))
-    );
+    m.set('royalties', '0x' + stringToHex(JSON.stringify({ decimals: 4, shares: { [formData.toAddress]: Math.round(r * 100) } })));
     const filtered = attributes.filter((a) => a.name && a.value);
     if (filtered.length) m.set('attributes', '0x' + stringToHex(JSON.stringify(filtered)));
     if (tags.length) m.set('tags', '0x' + stringToHex(JSON.stringify(tags)));
@@ -370,7 +402,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             multiline
             rows={4}
             placeholder="NFT description"
-            inputProps={{ maxLength: 250 }}
+            inputProps={{ maxLength: 5000 }}
           />
         </Grid>
 
@@ -542,9 +574,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         </Grid>
 
         <Grid size={12}>
-          <Typography variant="body1">
-            Tags * (enter comma or press Enter to add)
-          </Typography>
+          <Typography variant="body1">Tags * (enter comma or press Enter to add)</Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
             {tags.map((t) => (
               <Chip
@@ -622,10 +652,10 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       </Grid>
 
       <Section>
-        <Typography variant="subtitle2">
+        <Typography variant="subtitle2" sx={{ marginTop: 10 }}>
           Approx. Metadata Size: {Math.floor(metadataSize).toLocaleString()} / {MAX_METADATA_SIZE} bytes{' '}
           <Tooltip title="This is the estimated total metadata size (including a fixed overhead of 360 bytes) that will be stored on-chain. The hard limit is 32,768 bytes." arrow>
-            <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
+            <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
           </Tooltip>
         </Typography>
         {metadataSize > MAX_METADATA_SIZE && (
@@ -635,7 +665,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         )}
       </Section>
 
-      <Box sx={{ mt: 2, textAlign: 'right' }}>
+      <Box sx={{ marginTop: 20, textAlign: 'right' }}>
         <Button
           variant="contained"
           color="success"
@@ -653,26 +683,26 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           <Typography variant="body2">
             <strong>Fee:</strong> {estimation.estimatedFeeTez} ꜩ{' '}
             <Tooltip title="Network fee required for minting" arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
             <strong>Storage Cost:</strong> {estimation.estimatedStorageCostTez} ꜩ{' '}
             <Tooltip title="On‑chain storage cost" arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
             </Tooltip>
           </Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}>
+          <Typography variant="body2" sx={{ marginTop: 5 }}>
             <strong>Total:</strong> {estimation.totalEstimatedCostTez} ꜩ{' '}
             <Tooltip title="Total cost (fee + storage)" arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
             </Tooltip>
           </Typography>
         </Section>
       )}
 
       <Section>
-        <Typography variant="body2" sx={{ mt: 2, textAlign: 'right' }}>
+        <Typography variant="body2" sx={{ marginTop: 10, textAlign: 'right' }}>
           After minting, check OBJKT! ✌️🤟🤘
         </Typography>
       </Section>
@@ -683,28 +713,28 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           <DialogContentText>
             Please review the estimated fees before proceeding.
           </DialogContentText>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            <strong>Fee:</strong> {dialog.estimatedFeeTez} ꜩ{' '}
+          <Typography variant="body2" sx={{ marginTop: 5 }}>
+            <strong>Fee:</strong> {estimation.estimatedFeeTez} ꜩ{' '}
             <Tooltip title="Network fee" arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: 5, verticalAlign: 'middle' }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
-            <strong>Storage:</strong> {dialog.estimatedStorageCostTez} ꜩ{' '}
+            <strong>Storage:</strong> {estimation.estimatedStorageCostTez} ꜩ{' '}
             <Tooltip title="Storage cost" arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: 5, verticalAlign: 'middle' }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
-            <strong>Gas Limit:</strong> {dialog.estimatedGasLimit}
+            <strong>Gas Limit:</strong> {estimation.estimatedGasLimit}
           </Typography>
           <Typography variant="body2">
-            <strong>Storage Limit:</strong> {dialog.estimatedStorageLimit}
+            <strong>Storage Limit:</strong> {estimation.estimatedStorageLimit}
           </Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            <strong>Total:</strong> {dialog.totalEstimatedCostTez} ꜩ{' '}
+          <Typography variant="body2" sx={{ marginTop: 5 }}>
+            <strong>Total:</strong> {estimation.totalEstimatedCostTez} ꜩ{' '}
             <Tooltip title="Total cost (fee + storage)" arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
+              <InfoIcon fontSize="small" sx={{ marginLeft: 5, verticalAlign: 'middle' }} />
             </Tooltip>
           </Typography>
         </DialogContent>
@@ -717,6 +747,64 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={contractDetailsDialogOpen}
+        onClose={() => setContractDetailsDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        disableEnforceFocus
+        disableAutoFocus
+      >
+        <DialogTitle>Contract Deployed Successfully</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Your contract has been successfully deployed. Please copy your contract address and store it safely.
+          </DialogContentText>
+          <Pre>{contractAddress}</Pre>
+          <Box sx={{ textAlign: 'center', my: 2 }}>
+            <Button variant="outlined" onClick={handlePopupCopy} sx={{ maxWidth: '300px', mx: 'auto' }}>
+              Copy Contract Address
+            </Button>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2 }}>
+            <Link
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              color="primary"
+            >
+              View on Ghostnet OBJKT
+            </Link>
+            <Link
+              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              color="primary"
+            >
+              View on Better-Call.dev
+            </Link>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setContractDetailsDialogOpen(false)} color="primary">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };
