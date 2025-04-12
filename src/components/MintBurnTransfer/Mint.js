@@ -1,7 +1,6 @@
-/*Developed by @jams2blues with love for the Tezos community
-  File: src/components/MintBurnTransfer/Mint.js
-  Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
-           The NFT description field now allows up to 5000 characters.
+/* Developed by @jams2blues with love for the Tezos community
+   File: src/components/MintBurnTransfer/Mint.js
+   Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
 */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -45,25 +44,15 @@ const MAX_TAG_LENGTH = 20;
 const TAG_REGEX = /^[a-zA-Z0-9-_]+$/;
 const MAX_ROYALTIES = 25;
 const STORAGE_COST_PER_BYTE = 0.00025;
-// Overhead bytes as determined in testing (360 bytes)
+// Set overhead to 360 bytes to account for extra encoding overhead as determined in testing.
 const OVERHEAD_BYTES = 360;
 
 const ON_CHAIN_LICENSE = "On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z";
+
 const MAX_METADATA_SIZE = 32768;
 
 const Section = styled.div`
   margin-top: 20px;
-`;
-
-// Preformatted text styling for metadata preview
-const Pre = styled('pre')`
-  background-color: #f5f5f5;
-  padding: 10px;
-  max-height: 300px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-size: 0.9rem;
 `;
 
 const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
@@ -192,7 +181,10 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     m.set('name', '0x' + stringToHex(formData.name));
     m.set('description', '0x' + stringToHex(formData.description));
     m.set('artifactUri', '0x' + stringToHex(artifactDataUrl || ''));
-    m.set('creators', '0x' + stringToHex(JSON.stringify(formData.creators.split(',').map((c) => c.trim()))));
+    m.set(
+      'creators',
+      '0x' + stringToHex(JSON.stringify(formData.creators.split(',').map((c) => c.trim())))
+    );
     if (formData.license) {
       const rights = formData.license === 'Custom' ? formData.customLicense : formData.license;
       if (rights.trim()) m.set('rights', '0x' + stringToHex(rights));
@@ -200,7 +192,10 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
     m.set('decimals', '0x' + stringToHex('0'));
     if (artifactFile?.type) m.set('mimeType', '0x' + stringToHex(artifactFile.type));
     const r = parseFloat(formData.royalties || '0');
-    m.set('royalties', '0x' + stringToHex(JSON.stringify({ decimals: 4, shares: { [formData.toAddress]: Math.round(r * 100) } })));
+    m.set(
+      'royalties',
+      '0x' + stringToHex(JSON.stringify({ decimals: 4, shares: { [formData.toAddress]: Math.round(r * 100) } }))
+    );
     const filtered = attributes.filter((a) => a.name && a.value);
     if (filtered.length) m.set('attributes', '0x' + stringToHex(JSON.stringify(filtered)));
     if (tags.length) m.set('tags', '0x' + stringToHex(JSON.stringify(tags)));
@@ -213,55 +208,6 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   useEffect(() => {
     setMetadataSize(approximateMetadataSize(buildMetadata()));
   }, [formData, attributes, tags, artifactFile, artifactDataUrl]);
-
-  const validateField = (field, value) => {
-    let err = '';
-    switch (field) {
-      case 'name':
-        if (!value) err = 'Name is required.';
-        else if (value.length > 30) err = 'Max 30 characters.';
-        break;
-      case 'description':
-        if (!value) err = 'Description is required.';
-        else if (value.length > 5000) err = 'Max 5000 characters.';
-        break;
-      case 'symbol':
-        if (!value) err = 'Symbol is required.';
-        else if (value.length < 3) err = 'Min 3 characters.';
-        else if (value.length > 5) err = 'Max 5 characters.';
-        else {
-          const pattern = /^[A-Za-z0-9]{3,5}$/;
-          if (!pattern.test(value)) err = 'Letters and numbers only.';
-        }
-        break;
-      case 'creators':
-        if (!value) err = 'Creator(s) required.';
-        else if (value.length > 200) err = 'Max 200 characters.';
-        break;
-      case 'authors':
-        if (!value) err = 'Author(s) required.';
-        else if (value.length > 50) err = 'Max 50 characters.';
-        break;
-      case 'authorAddresses': {
-        const authors = formData.authors.split(',').map(a => a.trim()).filter(Boolean);
-        const addresses = value.split(',').map(a => a.trim()).filter(Boolean);
-        if (authors.length !== addresses.length) err = 'Authors and addresses count must match.';
-        else addresses.forEach(addr => {
-          if (!isValidTezosAddress(addr)) err = `Invalid address: ${addr}`;
-        });
-        break;
-      }
-      case 'imageUri':
-        if (!value) err = 'Image URI required.';
-        break;
-      case 'agreeToTerms':
-        if (!value) err = 'Must agree to terms.';
-        break;
-      default:
-        break;
-    }
-    return err;
-  };
 
   const validateForm = () => {
     const required = ['name', 'description', 'creators', 'toAddress', 'license'];
@@ -326,12 +272,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           : contract.methods.mint(parseInt(formData.amount, 10), map, formData.toAddress);
       const params = await op.toTransferParams();
       const est = await tezos.estimate.transfer(params);
-      const feeTez = new BigNumber(est.suggestedFeeMutez)
-        .dividedBy(1e6)
-        .toFixed(6);
-      const storageTez = new BigNumber(est.storageLimit)
-        .times(STORAGE_COST_PER_BYTE)
-        .toFixed(6);
+      const feeTez = new BigNumber(est.suggestedFeeMutez).dividedBy(1e6).toFixed(6);
+      const storageTez = new BigNumber(est.storageLimit).times(STORAGE_COST_PER_BYTE).toFixed(6);
       const totalTez = new BigNumber(feeTez).plus(storageTez).toFixed(6);
       const obj = {
         estimatedFeeTez: feeTez,
@@ -428,18 +370,13 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             multiline
             rows={4}
             placeholder="NFT description"
-            inputProps={{ maxLength: 5000 }}
+            inputProps={{ maxLength: 250 }}
           />
         </Grid>
 
         <Grid size={12}>
-          <Typography variant="body1">
-            Artifact File (≤20 KB recommended)
-          </Typography>
-          <MintUpload
-            onFileChange={handleFileChange}
-            onFileDataUrlChange={handleFileDataUrlChange}
-          />
+          <Typography variant="body1">Artifact File (≤20KB recommended)</Typography>
+          <MintUpload onFileChange={handleFileChange} onFileDataUrlChange={handleFileDataUrlChange} />
         </Grid>
 
         {artifactDataUrl && (
@@ -494,12 +431,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               label="License *"
             >
               <MenuItem value="">Select a License</MenuItem>
-              <MenuItem value="CC0 (Public Domain)">
-                CC0 (Public Domain)
-              </MenuItem>
-              <MenuItem value="All Rights Reserved">
-                All Rights Reserved
-              </MenuItem>
+              <MenuItem value="CC0 (Public Domain)">CC0 (Public Domain)</MenuItem>
+              <MenuItem value="All Rights Reserved">All Rights Reserved</MenuItem>
               <MenuItem value={ON_CHAIN_LICENSE}>{ON_CHAIN_LICENSE}</MenuItem>
               <MenuItem value="CC BY 4.0">CC BY 4.0</MenuItem>
               <MenuItem value="CC BY-SA 4.0">CC BY‑SA 4.0</MenuItem>
@@ -542,12 +475,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               onChange={handleInputChange}
               label="NSFW Content"
             >
-              <MenuItem value="Does not contain NSFW">
-                Does not contain NSFW
-              </MenuItem>
-              <MenuItem value="Does contain NSFW">
-                Does contain NSFW
-              </MenuItem>
+              <MenuItem value="Does not contain NSFW">Does not contain NSFW</MenuItem>
+              <MenuItem value="Does contain NSFW">Does contain NSFW</MenuItem>
             </Select>
           </FormControl>
           <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
@@ -564,20 +493,12 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
               onChange={handleInputChange}
               label="Flashing Hazards"
             >
-              <MenuItem value="Does not contain Flashing Hazard">
-                Does not contain Flashing Hazard
-              </MenuItem>
-              <MenuItem value="Does contain Flashing Hazard">
-                Does contain Flashing Hazard
-              </MenuItem>
+              <MenuItem value="Does not contain Flashing Hazard">Does not contain Flashing Hazard</MenuItem>
+              <MenuItem value="Does contain Flashing Hazard">Does contain Flashing Hazard</MenuItem>
             </Select>
           </FormControl>
           <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-            <Link
-              href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
+            <Link href="https://kb.daisy.org/publishing/docs/metadata/schema.org/accessibilityHazard.html#value" target="_blank" rel="noopener noreferrer">
               Learn more
             </Link>
           </Typography>
@@ -701,23 +622,20 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       </Grid>
 
       <Section>
-        <Typography variant="subtitle2" sx={{ marginTop: 10 }}>
+        <Typography variant="subtitle2">
           Approx. Metadata Size: {Math.floor(metadataSize).toLocaleString()} / {MAX_METADATA_SIZE} bytes{' '}
-          <Tooltip
-            title="This is the estimated total metadata size (including a fixed overhead of 360 bytes) that will be stored on-chain. The hard limit is 32,768 bytes."
-            arrow
-          >
-            <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
+          <Tooltip title="This is the estimated total metadata size (including a fixed overhead of 360 bytes) that will be stored on-chain. The hard limit is 32,768 bytes." arrow>
+            <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
           </Tooltip>
         </Typography>
         {metadataSize > MAX_METADATA_SIZE && (
           <Typography variant="body2" color="error">
-            Warning: Metadata size exceeds the maximum allowed 32 KB. Minting is disabled.
+            Warning: Metadata size exceeds the maximum allowed 32 KB. Minting is disabled.
           </Typography>
         )}
       </Section>
 
-      <Box sx={{ marginTop: 20, textAlign: 'right' }}>
+      <Box sx={{ mt: 2, textAlign: 'right' }}>
         <Button
           variant="contained"
           color="success"
@@ -735,26 +653,26 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           <Typography variant="body2">
             <strong>Fee:</strong> {estimation.estimatedFeeTez} ꜩ{' '}
             <Tooltip title="Network fee required for minting" arrow>
-              <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
+              <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
             <strong>Storage Cost:</strong> {estimation.estimatedStorageCostTez} ꜩ{' '}
             <Tooltip title="On‑chain storage cost" arrow>
-              <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
+              <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
             </Tooltip>
           </Typography>
-          <Typography variant="body2" sx={{ marginTop: 5 }}>
+          <Typography variant="body2" sx={{ mt: 1 }}>
             <strong>Total:</strong> {estimation.totalEstimatedCostTez} ꜩ{' '}
             <Tooltip title="Total cost (fee + storage)" arrow>
-              <InfoIcon fontSize="small" sx={{ marginLeft: 5 }} />
+              <InfoIcon fontSize="small" sx={{ ml: 0.5 }} />
             </Tooltip>
           </Typography>
         </Section>
       )}
 
       <Section>
-        <Typography variant="body2" sx={{ marginTop: 10, textAlign: 'right' }}>
+        <Typography variant="body2" sx={{ mt: 2, textAlign: 'right' }}>
           After minting, check OBJKT! ✌️🤟🤘
         </Typography>
       </Section>
@@ -765,28 +683,28 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           <DialogContentText>
             Please review the estimated fees before proceeding.
           </DialogContentText>
-          <Typography variant="body2" sx={{ marginTop: 5 }}>
-            <strong>Fee:</strong> {estimation.estimatedFeeTez} ꜩ{' '}
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <strong>Fee:</strong> {dialog.estimatedFeeTez} ꜩ{' '}
             <Tooltip title="Network fee" arrow>
-              <InfoIcon fontSize="small" sx={{ marginLeft: 5, verticalAlign: 'middle' }} />
+              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
-            <strong>Storage:</strong> {estimation.estimatedStorageCostTez} ꜩ{' '}
+            <strong>Storage:</strong> {dialog.estimatedStorageCostTez} ꜩ{' '}
             <Tooltip title="Storage cost" arrow>
-              <InfoIcon fontSize="small" sx={{ marginLeft: 5, verticalAlign: 'middle' }} />
+              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
             </Tooltip>
           </Typography>
           <Typography variant="body2">
-            <strong>Gas Limit:</strong> {estimation.estimatedGasLimit}
+            <strong>Gas Limit:</strong> {dialog.estimatedGasLimit}
           </Typography>
           <Typography variant="body2">
-            <strong>Storage Limit:</strong> {estimation.estimatedStorageLimit}
+            <strong>Storage Limit:</strong> {dialog.estimatedStorageLimit}
           </Typography>
-          <Typography variant="body2" sx={{ marginTop: 5 }}>
-            <strong>Total:</strong> {estimation.totalEstimatedCostTez} ꜩ{' '}
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <strong>Total:</strong> {dialog.totalEstimatedCostTez} ꜩ{' '}
             <Tooltip title="Total cost (fee + storage)" arrow>
-              <InfoIcon fontSize="small" sx={{ marginLeft: 5, verticalAlign: 'middle' }} />
+              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle' }} />
             </Tooltip>
           </Typography>
         </DialogContent>
@@ -799,72 +717,6 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      <Dialog
-        open={contractDetailsDialogOpen}
-        onClose={() => setContractDetailsDialogOpen(false)}
-        fullWidth
-        maxWidth="sm"
-        disableEnforceFocus
-        disableAutoFocus
-      >
-        <DialogTitle>Contract Deployed Successfully</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Your contract has been successfully deployed. Please copy your contract address
-            and store it safely.
-          </DialogContentText>
-          <Pre>{contractAddress}</Pre>
-          <Box sx={{ textAlign: 'center', my: 2 }}>
-            <Button variant="outlined" onClick={async () => {
-              const ok = await copyToClipboard(contractAddress);
-              setSnackbar({
-                open: true,
-                message: ok ? 'Contract address copied!' : 'Failed to copy address.',
-                severity: ok ? 'success' : 'error',
-              });
-            }} sx={{ maxWidth: '300px', mx: 'auto' }}>
-              Copy Contract Address
-            </Button>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2 }}>
-            <Link
-              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              underline="hover"
-              color="primary"
-            >
-              View on Ghostnet OBJKT
-            </Link>
-            <Link
-              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
-              target="_blank"
-              rel="noopener noreferrer"
-              underline="hover"
-              color="primary"
-            >
-              View on Better-Call.dev
-            </Link>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setContractDetailsDialogOpen(false)} color="primary">
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Snackbar
-        open={setSnackbar.open || false}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar({ open: false, message: '', severity: 'info' })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbar({ open: false, message: '', severity: 'info' })} severity={setSnackbar.severity || 'info'} sx={{ width: '100%' }}>
-          {setSnackbar.message}
-        </Alert>
-      </Snackbar>
     </div>
   );
 };
