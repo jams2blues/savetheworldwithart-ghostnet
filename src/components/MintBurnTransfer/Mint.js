@@ -47,21 +47,20 @@ const MAX_ROYALTIES = 25;
 const STORAGE_COST_PER_BYTE = 0.00025;
 // Set overhead to 360 bytes to account for extra encoding overhead as determined in testing.
 const OVERHEAD_BYTES = 360;
+
 const ON_CHAIN_LICENSE = "On-Chain NFT License 2.0 KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z";
+
 const MAX_METADATA_SIZE = 32768;
 
 const Section = styled.div`
   margin-top: 20px;
 `;
 
-// Convert string to hex using Buffer
 const stringToHex = (str) => Buffer.from(str, 'utf8').toString('hex');
 
-// Tezos address validation
 const isValidTezosAddress = (addr) =>
   /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
 
-// Estimate metadata size from MichelsonMap entries
 const approximateMetadataSize = (map) => {
   let total = 0;
   for (const [k, v] of map.entries()) {
@@ -73,18 +72,13 @@ const approximateMetadataSize = (map) => {
   return total + OVERHEAD_BYTES;
 };
 
-/**
- * Robust helper to copy text to the clipboard.
- * It first tries navigator.clipboard.writeText; if that fails (or in case of focus issues inside an iframe dialog),
- * it falls back to using a temporary textarea and document.execCommand('copy').
- */
 const copyToClipboard = async (text) => {
   try {
     if (navigator.permissions && navigator.permissions.query) {
       const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
       if (state === 'granted' || state === 'prompt') {
         await navigator.clipboard.writeText(text);
-        // Always run fallback as a backup due to focus traps in Dialogs
+        // Always run fallback as backup because of focus issues in iframes.
       }
     }
   } catch (permErr) {
@@ -131,8 +125,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const [loading, setLoading] = useState(false);
   const [estimation, setEstimation] = useState({});
   const [dialog, setDialog] = useState({ open: false });
-  
-  // For minted NFT address response. OBJKT uses KT1 addresses.
+  const [contractDetailsDialogOpen, setContractDetailsDialogOpen] = useState(false); // Added state to fix error
   const [mintedAddress, setMintedAddress] = useState('');
 
   const snack = (msg, severity = 'warning') =>
@@ -240,6 +233,55 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   useEffect(() => {
     setMetadataSize(approximateMetadataSize(buildMetadata()));
   }, [formData, attributes, tags, artifactFile, artifactDataUrl]);
+
+  const validateField = (field, value) => {
+    let err = '';
+    switch (field) {
+      case 'name':
+        if (!value) err = 'Name is required.';
+        else if (value.length > 30) err = 'Max 30 characters.';
+        break;
+      case 'description':
+        if (!value) err = 'Description is required.';
+        else if (value.length > 5000) err = 'Max 5000 characters.';
+        break;
+      case 'symbol':
+        if (!value) err = 'Symbol is required.';
+        else if (value.length < 3) err = 'Min 3 characters.';
+        else if (value.length > 5) err = 'Max 5 characters.';
+        else {
+          const pattern = /^[A-Za-z0-9]{3,5}$/;
+          if (!pattern.test(value)) err = 'Letters and numbers only.';
+        }
+        break;
+      case 'creators':
+        if (!value) err = 'Creator(s) required.';
+        else if (value.length > 200) err = 'Max 200 characters.';
+        break;
+      case 'authors':
+        if (!value) err = 'Author(s) required.';
+        else if (value.length > 50) err = 'Max 50 characters.';
+        break;
+      case 'authorAddresses': {
+        const authors = formData.authors.split(',').map(a => a.trim()).filter(Boolean);
+        const addresses = value.split(',').map(a => a.trim()).filter(Boolean);
+        if (authors.length !== addresses.length) err = 'Authors and addresses count must match.';
+        else addresses.forEach(addr => {
+          if (!isValidTezosAddress(addr)) err = `Invalid address: ${addr}`;
+        });
+        break;
+      }
+      case 'imageUri':
+        if (!value) err = 'Image URI required.';
+        break;
+      case 'agreeToTerms':
+        if (!value) err = 'Must agree to terms.';
+        break;
+      default:
+        break;
+    }
+    return err;
+  };
 
   const validateForm = () => {
     const required = ['name', 'description', 'creators', 'toAddress', 'license'];
