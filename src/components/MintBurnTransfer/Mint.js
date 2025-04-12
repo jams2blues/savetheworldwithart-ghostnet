@@ -1,6 +1,6 @@
-/* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/Mint.js
-   Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/MintBurnTransfer/Mint.js
+  Summary: Component for minting NFTs on-chain with full validations and V3 functionality.
 */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -370,7 +370,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             multiline
             rows={4}
             placeholder="NFT description"
-            inputProps={{ maxLength: 250 }}
+            inputProps={{ maxLength: 5000 }}
           />
         </Grid>
 
