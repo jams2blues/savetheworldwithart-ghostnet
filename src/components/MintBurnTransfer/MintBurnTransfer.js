@@ -526,7 +526,7 @@ const MintBurnTransfer = () => {
                 </Typography>
 
                 {/* v3 Parent / Child Controls */}
-                {contractVersion === 'v3' && (
+                {(contractVersion === 'v3' || contractVersion.startsWith('v2')) && (
                   <>
                     <Button
                       variant="outlined"
@@ -582,8 +582,8 @@ const MintBurnTransfer = () => {
                   </>
                 )}
 
-                {/* View existing Parent/Child pairs */}
-                {(contractVersion === 'v2' || contractVersion === 'v3') && (
+                {/* Existing Parent/Child relationships viewer (v2+ and v3) */}
+                {(contractVersion.startsWith('v2') || contractVersion === 'v3') && (
                   <ManageParentChild
                     contractAddress={contractAddress}
                     tezos={tezos}
