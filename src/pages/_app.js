@@ -1,7 +1,8 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/pages/_app.js
-  Summary: Adds a global “unhandledrejection” trap so the Beacon
-           “Proposal expired” promise‑rejection never crashes Next.js.
+  Summary: Global app wrapper with Theme, WalletProvider and guards that
+           swallow Beacon / WalletConnect “Proposal expired” errors in both
+           promise‑rejection *and* synchronous Error forms.
 */
 import React, { useEffect } from 'react';
 import PropTypes from 'prop-types';
@@ -19,18 +20,29 @@ const theme = createTheme({
 });
 
 export default function MyApp({ Component, pageProps }) {
-  /* ─── Patch: swallow Beacon “Proposal expired” rejections ─── */
+  /* ── Swallow any “Proposal expired” noise so UI never crashes ── */
   useEffect(() => {
-    const handler = (evt) => {
+    const rejectionHandler = (evt) => {
       if (evt?.reason?.message?.includes('Proposal expired')) {
-        console.warn('Ignored Beacon error:', evt.reason.message);
-        evt.preventDefault();          // stops Next.js error overlay
+        console.warn('Ignored Beacon promise‑rejection:', evt.reason.message);
+        evt.preventDefault();
       }
     };
-    window.addEventListener('unhandledrejection', handler);
-    return () => window.removeEventListener('unhandledrejection', handler);
+    const errorHandler = (evt) => {
+      if (evt?.error?.message?.includes('Proposal expired')) {
+        console.warn('Ignored WalletConnect error:', evt.error.message);
+        evt.preventDefault();
+        return false;            // suppresses browser console red text
+      }
+    };
+    window.addEventListener('unhandledrejection', rejectionHandler);
+    window.addEventListener('error', errorHandler);
+    return () => {
+      window.removeEventListener('unhandledrejection', rejectionHandler);
+      window.removeEventListener('error', errorHandler);
+    };
   }, []);
-  /* ─────────────────────────────────────────────────────────── */
+  /* ───────────────────────────────────────────────────────────── */
 
   return (
     <>
