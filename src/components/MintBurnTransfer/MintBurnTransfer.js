@@ -64,109 +64,121 @@ const HASHES = {
   ghostnet: { v1: 943737041, v2a: -1889653220, v2b: -543526052, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
   mainnet: { v1: 943737041, v2a: -1889653220, v2b: -543526052, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
 };
-const makeHashList = (o) => Object.values(o).filter((n,i,arr)=>arr.indexOf(n)===i).join(',');
-const getVersion = (net,hash)=>
-  (Object.entries(HASHES[net]).find(([,h])=>h===hash)?.[0]||'v?').replace(/v2\./,'v2');
-const dataUriOk = (u)=>typeof u==='string'&&u.startsWith('data:');
-const parseHexJSON = (hex)=>{try{return JSON.parse(Buffer.from(hex.replace(/^0x/,''),
-  'hex').toString('utf8'));}catch{return{};}};
-const toNat = (raw)=>{
-  if (raw==null) return null;
-  if (typeof raw==='number') return raw;
-  if (typeof raw==='string') return parseInt(raw,10);
-  if (raw.int) return parseInt(raw.int,10);
+const makeHashList = (o) => Object.values(o).filter((n, i, arr) => arr.indexOf(n) === i).join(',');
+const getVersion = (net, hash) =>
+  (Object.entries(HASHES[net]).find(([, h]) => h === hash)?.[0] || 'v?').replace(/v2\./, 'v2');
+const dataUriOk = (u) => typeof u === 'string' && u.startsWith('data:');
+const parseHexJSON = (hex) => {
+  try {
+    return JSON.parse(Buffer.from(hex.replace(/^0x/, ''), 'hex').toString('utf8'));
+  } catch {
+    return {};
+  }
+};
+const toNat = (raw) => {
+  if (raw == null) return null;
+  if (typeof raw === 'number') return raw;
+  if (typeof raw === 'string') return parseInt(raw, 10);
+  if (raw.int) return parseInt(raw.int, 10);
   return null;
 };
-const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
-async function fetchJSON(url,tries=3){
-  for(let i=0;i<tries;i++){
-    try{
-      const r=await fetch(url,{mode:'cors'});
-      if(r.status===429){await sleep(600*(i+1));continue;}
-      if(!r.ok)throw new Error(`HTTP ${r.status}`);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function fetchJSON(url, tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const r = await fetch(url, { mode: 'cors' });
+      if (r.status === 429) {
+        await sleep(600 * (i + 1));
+        continue;
+      }
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
-    }catch{
-      if(i===tries-1)throw new Error('fetch failed');
-      await sleep(400*(i+1));
+    } catch {
+      if (i === tries - 1) throw new Error('fetch failed');
+      await sleep(400 * (i + 1));
     }
   }
 }
 
 /* ─── Fetching contracts & details ─────────────────────────────── */
-async function _fetchCreatedContracts({walletAddress,network}){
-  if(!walletAddress) return [];
-  const base=TZKT_BASE[network];
-  const hashes=makeHashList(HASHES[network]);
-  const created=await fetchJSON(`${base}/contracts?creator.eq=${walletAddress}&typeHash.in=${hashes}&limit=200`);
-  return created.map(c=>({
-    address:c.address,
-    typeHash:c.typeHash,
-    timestamp:c.firstActivityTime||c.lastActivityTime,
+async function _fetchCreatedContracts({ walletAddress, network }) {
+  if (!walletAddress) return [];
+  const base = TZKT_BASE[network];
+  const hashes = makeHashList(HASHES[network]);
+  const created = await fetchJSON(`${base}/contracts?creator.eq=${walletAddress}&typeHash.in=${hashes}&limit=200`);
+  return created.map((c) => ({
+    address: c.address,
+    typeHash: c.typeHash,
+    timestamp: c.firstActivityTime || c.lastActivityTime,
   }));
 }
-async function _fetchCollaborativeContracts({walletAddress,network}){
-  if(!walletAddress) return [];
-  const base=TZKT_BASE[network];
-  const v3Hash=HASHES[network].v3;
-  const contracts=await fetchJSON(`${base}/contracts?typeHash.eq=${v3Hash}&limit=200`);
-  const matched=[];
-  const queue=[...contracts];
-  await Promise.all(Array.from({length:5}).map(async()=>{
-    while(queue.length){
-      const c=queue.shift();
-      try{
-        const storage=await fetchJSON(`${base}/contracts/${c.address}/storage`);
-        if(Array.isArray(storage.collaborators)&&storage.collaborators.includes(walletAddress)){
-          matched.push({
-            address:c.address,
-            typeHash:c.typeHash,
-            timestamp:c.firstActivityTime||c.lastActivityTime,
-          });
-        }
-      }catch{}
-    }
-  }));
+async function _fetchCollaborativeContracts({ walletAddress, network }) {
+  if (!walletAddress) return [];
+  const base = TZKT_BASE[network];
+  const v3Hash = HASHES[network].v3;
+  const contracts = await fetchJSON(`${base}/contracts?typeHash.eq=${v3Hash}&limit=200`);
+  const matched = [];
+  const queue = [...contracts];
+  await Promise.all(
+    Array.from({ length: 5 }).map(async () => {
+      while (queue.length) {
+        const c = queue.shift();
+        try {
+          const storage = await fetchJSON(`${base}/contracts/${c.address}/storage`);
+          if (Array.isArray(storage.collaborators) && storage.collaborators.includes(walletAddress)) {
+            matched.push({
+              address: c.address,
+              typeHash: c.typeHash,
+              timestamp: c.firstActivityTime || c.lastActivityTime,
+            });
+          }
+        } catch {}
+      }
+    })
+  );
   return matched;
 }
-async function _fetchDetails(list,network,signal){
-  const out=[];
-  const queue=[...list];
-  await Promise.all(Array.from({length:3}).map(async()=>{
-    while(queue.length){
-      if(signal?.aborted) return;
-      const {address,typeHash,timestamp}=queue.shift();
-      try{
-        const det=await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}`);
-        let meta=det.metadata||{};
-        if(!meta.name||!meta.imageUri||!meta.description){
-          const bm=await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}/bigmaps/metadata/keys/content`).catch(()=>null);
-          if(bm?.value) meta={...parseHexJSON(bm.value),...meta};
-        }
-        const stor=await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}/storage`).catch(()=>({}));
-        out.push({
-          address,
-          name:meta.name||address,
-          description:meta.description||'',
-          imageUri:dataUriOk(meta.imageUri)?meta.imageUri:'',
-          total:toNat(stor.all_tokens)??toNat(stor.next_token_id),
-          version:getVersion(network,typeHash),
-          date:timestamp,
-        });
-      }catch{}
-    }
-  }));
-  out.sort((a,b)=>new Date(b.date)-new Date(a.date));
+async function _fetchDetails(list, network, signal) {
+  const out = [];
+  const queue = [...list];
+  await Promise.all(
+    Array.from({ length: 3 }).map(async () => {
+      while (queue.length) {
+        if (signal?.aborted) return;
+        const { address, typeHash, timestamp } = queue.shift();
+        try {
+          const det = await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}`);
+          let meta = det.metadata || {};
+          if (!meta.name || !meta.imageUri || !meta.description) {
+            const bm = await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}/bigmaps/metadata/keys/content`).catch(() => null);
+            if (bm?.value) meta = { ...parseHexJSON(bm.value), ...meta };
+          }
+          const stor = await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}/storage`).catch(() => ({}));
+          out.push({
+            address,
+            name: meta.name || address,
+            description: meta.description || '',
+            imageUri: dataUriOk(meta.imageUri) ? meta.imageUri : '',
+            total: toNat(stor.all_tokens) ?? toNat(stor.next_token_id),
+            version: getVersion(network, typeHash),
+            date: timestamp,
+          });
+        } catch {}
+      }
+    })
+  );
+  out.sort((a, b) => new Date(b.date) - new Date(a.date));
   return out;
 }
-const fetchMetadata=async(address,network)=>{
-  const base=TZKT_BASE[network];
-  const det=await fetchJSON(`${base}/contracts/${address}`);
-  let meta=det.metadata||{};
-  if(!meta.name||!meta.imageUri||!meta.description){
-    const bm=await fetchJSON(`${base}/contracts/${address}/bigmaps/metadata/keys/content`).catch(()=>null);
-    if(bm?.value) meta={...parseHexJSON(bm.value),...meta};
+const fetchMetadata = async (address, network) => {
+  const base = TZKT_BASE[network];
+  const det = await fetchJSON(`${base}/contracts/${address}`);
+  let meta = det.metadata || {};
+  if (!meta.name || !meta.imageUri || !meta.description) {
+    const bm = await fetchJSON(`${base}/contracts/${address}/bigmaps/metadata/keys/content`).catch(() => null);
+    if (bm?.value) meta = { ...parseHexJSON(bm.value), ...meta };
   }
-  return {meta,version:getVersion(network,det.typeHash)};
+  return { meta, version: getVersion(network, det.typeHash) };
 };
 
 /* ─── Main Component ───────────────────────────────────────────── */
@@ -177,93 +189,114 @@ const MintBurnTransfer = () => {
   const [contractVersion, setContractVersion] = useState('');
   const [action, setAction] = useState('');
   const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({open:false,message:'',severity:'info'});
-  const snack=(m,s='info')=>setSnackbar({open:true,message:m,severity:s});
-  const closeSnack=()=>setSnackbar(p=>({...p,open:false}));
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const snack = (m, s = 'info') => setSnackbar({ open: true, message: m, severity: s });
+  const closeSnack = () => setSnackbar((p) => ({ ...p, open: false }));
 
   const [origContracts, setOrigContracts] = useState([]);
   const [origLoading, setOrigLoading] = useState(true);
   const [origIdx, setOrigIdx] = useState(0);
-  useEffect(()=>{ if(origContracts.length && origIdx>=origContracts.length) setOrigIdx(0); },[origContracts.length,origIdx]);
+  useEffect(() => {
+    if (origContracts.length && origIdx >= origContracts.length) setOrigIdx(0);
+  }, [origContracts.length, origIdx]);
 
   const [collabContracts, setCollabContracts] = useState([]);
   const [collabLoading, setCollabLoading] = useState(true);
   const [collabIdx, setCollabIdx] = useState(0);
-  useEffect(()=>{ if(collabContracts.length && collabIdx>=collabContracts.length) setCollabIdx(0); },[collabContracts.length,collabIdx]);
+  useEffect(() => {
+    if (collabContracts.length && collabIdx >= collabContracts.length) setCollabIdx(0);
+  }, [collabContracts.length, collabIdx]);
 
   const abortRef = useRef(null);
-  const scan = useCallback(async()=>{
-    if(!isWalletConnected){ setOrigLoading(false); setCollabLoading(false); return; }
-    setOrigLoading(true); setCollabLoading(true);
+  const scan = useCallback(async () => {
+    if (!isWalletConnected) {
+      setOrigLoading(false);
+      setCollabLoading(false);
+      return;
+    }
+    setOrigLoading(true);
+    setCollabLoading(true);
     abortRef.current?.abort();
-    abortRef.current=new AbortController();
+    abortRef.current = new AbortController();
     try {
       const [cr, col] = await Promise.all([
-        _fetchCreatedContracts({walletAddress,network}),
-        _fetchCollaborativeContracts({walletAddress,network})
+        _fetchCreatedContracts({ walletAddress, network }),
+        _fetchCollaborativeContracts({ walletAddress, network }),
       ]);
-      const [oList,cList] = await Promise.all([
-        _fetchDetails(cr,network,abortRef.current.signal),
-        _fetchDetails(col,network,abortRef.current.signal)
+      const [oList, cList] = await Promise.all([
+        _fetchDetails(cr, network, abortRef.current.signal),
+        _fetchDetails(col, network, abortRef.current.signal),
       ]);
       setOrigContracts(oList);
       setCollabContracts(cList);
-    } catch{}
-    finally { setOrigLoading(false); setCollabLoading(false); }
-  },[isWalletConnected,walletAddress,network]);
+    } catch {}
+    finally {
+      setOrigLoading(false);
+      setCollabLoading(false);
+    }
+  }, [isWalletConnected, walletAddress, network]);
 
-  useEffect(()=>{
+  useEffect(() => {
     scan();
-    window.addEventListener('focus',scan);
-    return()=>{ window.removeEventListener('focus',scan); abortRef.current?.abort(); };
-  },[scan]);
+    window.addEventListener('focus', scan);
+    return () => {
+      window.removeEventListener('focus', scan);
+      abortRef.current?.abort();
+    };
+  }, [scan]);
 
-  const chooseOrigin = ()=>{
-    const c=origContracts[origIdx];
-    if(!c) return;
+  const chooseOrigin = () => {
+    const c = origContracts[origIdx];
+    if (!c) return;
     setContractAddress(c.address);
-    setContractMetadata({name:c.name,description:c.description,imageUri:c.imageUri});
+    setContractMetadata({ name: c.name, description: c.description, imageUri: c.imageUri });
     setContractVersion(c.version);
-    snack('Originated contract loaded','success');
+    snack('Originated contract loaded', 'success');
   };
-  const chooseCollab = ()=>{
-    const c=collabContracts[collabIdx];
-    if(!c) return;
+  const chooseCollab = () => {
+    const c = collabContracts[collabIdx];
+    if (!c) return;
     setContractAddress(c.address);
-    setContractMetadata({name:c.name,description:c.description,imageUri:c.imageUri});
+    setContractMetadata({ name: c.name, description: c.description, imageUri: c.imageUri });
     setContractVersion(c.version);
-    snack('Collaborative contract loaded','info');
+    snack('Collaborative contract loaded', 'info');
   };
-  const loadManual=async()=>{
-    if(!contractAddress) return snack('Enter a contract address','warning');
+  const loadManual = async () => {
+    if (!contractAddress) return snack('Enter a contract address', 'warning');
     setLoading(true);
-    try{
-      const {meta,version}=await fetchMetadata(contractAddress,network);
+    try {
+      const { meta, version } = await fetchMetadata(contractAddress, network);
       setContractMetadata(meta);
       setContractVersion(version);
-      snack('Metadata loaded','success');
-    }catch{
-      try{
-        const contract=await tezos.contract.at(contractAddress);
-        const storage=await contract.storage();
-        const ver=storage.contract_id&&Buffer.from(storage.contract_id,'hex').toString('utf8')==='ZeroContract'
-          ?'v3':storage.all_tokens!==undefined?'v2':'v1';
+      snack('Metadata loaded', 'success');
+    } catch {
+      try {
+        const contract = await tezos.contract.at(contractAddress);
+        const storage = await contract.storage();
+        const ver =
+          storage.contract_id && Buffer.from(storage.contract_id, 'hex').toString('utf8') === 'ZeroContract'
+            ? 'v3'
+            : storage.all_tokens !== undefined
+            ? 'v2'
+            : 'v1';
         setContractVersion(ver);
-        if(!storage.metadata) throw new Error('Metadata big_map missing');
-        const ptrRaw=await storage.metadata.get('');
-        const ptr=typeof ptrRaw==='string'?ptrRaw:Buffer.from(ptrRaw.bytes,'hex').toString('utf8');
-        const val=await storage.metadata.get(ptr.replace('tezos-storage:',''));
-        const str=typeof val==='string'?val:Buffer.from(val.bytes,'hex').toString('utf8');
+        if (!storage.metadata) throw new Error('Metadata big_map missing');
+        const ptrRaw = await storage.metadata.get('');
+        const ptr = typeof ptrRaw === 'string' ? ptrRaw : Buffer.from(ptrRaw.bytes, 'hex').toString('utf8');
+        const val = await storage.metadata.get(ptr.replace('tezos-storage:', ''));
+        const str = typeof val === 'string' ? val : Buffer.from(val.bytes, 'hex').toString('utf8');
         setContractMetadata(JSON.parse(str));
-        snack('Metadata loaded on‑chain','success');
-      }catch(e){
+        snack('Metadata loaded on‑chain', 'success');
+      } catch (e) {
         setContractMetadata(null);
         setContractVersion('');
-        snack(e.message||'Load failed','error');
+        snack(e.message || 'Load failed', 'error');
       }
-    }finally{setLoading(false);}
+    } finally {
+      setLoading(false);
+    }
   };
-  const handleAction=(a)=>setAction(a);
+  const handleAction = (a) => setAction(a);
 
   return (
     <StyledPaper elevation={3}>
@@ -617,9 +650,10 @@ const MintBurnTransfer = () => {
             </Grid>
           </Grid>
 
-          {/* Conditional Forms */}
-          {action === 'mint' && (
+{/* Conditional Forms */}
+{action === 'mint' && (
             <Mint
+              key={`${contractAddress}-${contractVersion}`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -628,6 +662,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'burn' && (
             <Burn
+              key={`${contractAddress}-burn`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -636,6 +671,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'transfer' && (
             <Transfer
+              key={`${contractAddress}-transfer`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -644,6 +680,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'balance_of' && (
             <BalanceOf
+              key={`${contractAddress}-balance`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -652,6 +689,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'update_operators' && (
             <UpdateOperators
+              key={`${contractAddress}-updateop`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -662,6 +700,7 @@ const MintBurnTransfer = () => {
           {/* Parent/Child Batch Forms */}
           {action === 'add_parent' && (
             <AddRemoveParentChild
+              key={`${contractAddress}-add_parent`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -670,6 +709,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'remove_parent' && (
             <AddRemoveParentChild
+              key={`${contractAddress}-remove_parent`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -678,6 +718,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'add_child' && (
             <AddRemoveParentChild
+              key={`${contractAddress}-add_child`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -686,6 +727,7 @@ const MintBurnTransfer = () => {
           )}
           {action === 'remove_child' && (
             <AddRemoveParentChild
+              key={`${contractAddress}-remove_child`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -696,6 +738,7 @@ const MintBurnTransfer = () => {
           {/* Collaborator Batch Form */}
           {action === 'collaborators' && (
             <AddRemoveCollaborator
+              key={`${contractAddress}-collab`}
               contractAddress={contractAddress}
               tezos={tezos}
               setSnackbar={setSnackbar}
@@ -714,8 +757,8 @@ const MintBurnTransfer = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-      </StyledPaper>
-      );
-    };
+    </StyledPaper>
+  );
+};
 
 export default MintBurnTransfer;
