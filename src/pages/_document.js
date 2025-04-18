@@ -19,7 +19,7 @@ export default class MyDocument extends Document {
 
           {/* Open Graph Meta Tags */}
           <meta property="og:title" content="Save The World With Art™" />
-          <meta property="og:description" content="The first fully on-chain minting platform for Tezos." />
+          <meta property="og:description" content="The first Tzip-compliant fully on-chain minting platform for Tezos." />
           <meta property="og:image" content="https://ghostnet.savetheworldwithart.io/images/ZeroContractBanner.png" />
           <meta property="og:url" content="https://ghostnet.savetheworldwithart.io/" />
           <meta property="og:type" content="website" />

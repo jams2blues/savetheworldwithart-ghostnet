@@ -1,37 +1,56 @@
-/* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/AddRemoveParentChild.js
-   Summary: Component to add or remove parent/child relationships for NFTs.
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/MintBurnTransfer/AddRemoveParentChild.js
+  Summary: Batch add or remove parent/child Tezos addresses via entrypoint calls
 */
 import React, { useState } from 'react';
-import { Typography, TextField, Button, CircularProgress, Grid } from '@mui/material';
+import {
+  Typography,
+  TextField,
+  Button,
+  CircularProgress,
+  Grid,
+  Tooltip,
+} from '@mui/material';
 
-const AddRemoveParentChild = ({ contractAddress, tezos, setSnackbar, contractVersion, actionType }) => {
-  const [address, setAddress] = useState('');
+const isValidTezosAddress = (addr) =>
+  /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
+
+const AddRemoveParentChild = ({ contractAddress, tezos, setSnackbar, actionType }) => {
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isValidTezosAddress = (addr) => /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(addr);
+  const runBatch = async () => {
+    const addresses = input
+      .split(/[\s,]+/)
+      .map((a) => a.trim())
+      .filter(Boolean);
 
-  const handleSubmit = async () => {
-    if (!address.trim()) {
-      setSnackbar({ open: true, message: 'Please enter a valid Tezos address.', severity: 'warning' });
+    if (!addresses.length) {
+      setSnackbar({ open: true, message: 'Please enter at least one address.', severity: 'warning' });
       return;
     }
-    if (!isValidTezosAddress(address.trim())) {
-      setSnackbar({ open: true, message: 'Invalid Tezos address.', severity: 'error' });
-      return;
+
+    for (const addr of addresses) {
+      if (!isValidTezosAddress(addr)) {
+        setSnackbar({ open: true, message: `Invalid Tezos address: ${addr}`, severity: 'error' });
+        return;
+      }
     }
+
     try {
       setLoading(true);
       const contract = await tezos.wallet.at(contractAddress);
-      const availableMethods = Object.keys(contract.methods);
-      if (!availableMethods.includes(actionType)) {
-        throw new Error(`Method "${actionType}" not supported.`);
-      }
-      const op = await contract.methods[actionType](address.trim()).send();
-      setSnackbar({ open: true, message: `${actionType.replace('_', ' ')} in progress...`, severity: 'info' });
+      let batchBuilder = tezos.wallet.batch();
+      addresses.forEach((addr) => {
+        batchBuilder = batchBuilder.withContractCall(
+          contract.methods[actionType](addr)
+        );
+      });
+      const op = await batchBuilder.send();
+      setSnackbar({ open: true, message: 'Operation in progress...', severity: 'info' });
       await op.confirmation();
-      setSnackbar({ open: true, message: `${actionType.replace('_', ' ')} successfully.`, severity: 'success' });
-      setAddress('');
+      setSnackbar({ open: true, message: 'Operation successful!', severity: 'success' });
+      setInput('');
     } catch (error) {
       setSnackbar({ open: true, message: `Operation failed: ${error.message}`, severity: 'error' });
     } finally {
@@ -39,41 +58,46 @@ const AddRemoveParentChild = ({ contractAddress, tezos, setSnackbar, contractVer
     }
   };
 
-  const getButtonLabel = () => {
+  const getLabel = () => {
     switch (actionType) {
-      case 'add_parent': return 'Add Parent';
-      case 'remove_parent': return 'Remove Parent';
-      case 'add_child': return 'Add Child';
-      case 'remove_child': return 'Remove Child';
+      case 'add_parent': return 'Add Parent(s)';
+      case 'remove_parent': return 'Remove Parent(s)';
+      case 'add_child': return 'Add Child(ren)';
+      case 'remove_child': return 'Remove Child(ren)';
       default: return 'Execute';
     }
   };
 
   return (
-    <div style={{ marginTop: '20px' }}>
-      <Typography variant="h6">{getButtonLabel()}</Typography>
+    <div style={{ marginTop: 20 }}>
+      <Typography variant="h6">{getLabel()}</Typography>
       <Grid container spacing={2} sx={{ mt: 1 }}>
         <Grid size={12}>
           <TextField
-            label="Tezos Address *"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            label="Tezos Address(es)"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
             fullWidth
-            placeholder="e.g., KT1..."
+            multiline
+            placeholder="Paste addresses separated by commas, spaces, or newlines"
           />
         </Grid>
       </Grid>
-      <div style={{ marginTop: '20px', textAlign: 'right' }}>
-        <Button
-          variant="contained"
-          color={actionType.includes('add') ? 'primary' : 'secondary'}
-          onClick={handleSubmit}
-          disabled={loading}
-          startIcon={loading ? <CircularProgress size={20} /> : null}
-        >
-          {loading ? 'Processing...' : getButtonLabel()}
-        </Button>
-      </div>
+      <Grid container spacing={2} sx={{ mt: 1 }}>
+        <Grid size={12} sx={{ textAlign: 'right' }}>
+          <Tooltip title="Batch this operation in one transaction.">
+            <Button
+              variant="contained"
+              color={actionType.includes('add') ? 'primary' : 'secondary'}
+              onClick={runBatch}
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={20} /> : null}
+            >
+              {loading ? 'Processing…' : getLabel()}
+            </Button>
+          </Tooltip>
+        </Grid>
+      </Grid>
     </div>
   );
 };
