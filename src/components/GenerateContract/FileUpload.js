@@ -63,8 +63,8 @@ const FileUpload = ({ setArtifactData }) => {
     if (file.size > RAW_MAX_SIZE) {
       setSnackbar({
         open: true,
-        message: 'File size exceeds 15MB. Please upload a smaller file.',
-        severity: 'error',
+        message: 'File size exceeds 15MB, things get hairy above this, try at your own risk.',
+        severity: 'warning',
       });
       e.target.value = null;
       return;
@@ -138,7 +138,7 @@ const FileUpload = ({ setArtifactData }) => {
         <Box sx={{ mt: 2, textAlign: 'center' }}>
           <img
             src={URL.createObjectURL(artifactFile)}
-            alt="NFT Thumbnail Preview"
+            alt="Collection Thumbnail Preview"
             style={{
               maxWidth: '100%',
               maxHeight: '300px',
@@ -159,11 +159,11 @@ const FileUpload = ({ setArtifactData }) => {
         ref={fileInputRef}
         accept={ACCEPTED_MIME_TYPES}
         style={{ display: 'none' }}
-        id="nft-file-upload"
+        id="collection-thumbnail-upload"
         type="file"
         onChange={handleFileChange}
       />
-      <label htmlFor="nft-file-upload">
+      <label htmlFor="collection-thumbnail-upload">
         <Button
           variant="contained"
           component="span"
@@ -171,9 +171,9 @@ const FileUpload = ({ setArtifactData }) => {
           sx={{ mt: 1 }}
           fullWidth={isSmallScreen}
           disabled={uploading}
-          aria-label="Upload NFT Artwork"
+          aria-label="Upload Collection Thumbnail"
         >
-          {uploading ? 'Uploading...' : 'Upload NFT Artwork'}
+          {uploading ? 'Uploading...' : 'Upload Collection Thumbnail'}
         </Button>
       </label>
 

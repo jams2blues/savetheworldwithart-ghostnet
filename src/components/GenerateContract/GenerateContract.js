@@ -706,7 +706,7 @@ const GenerateContract = () => {
                 </Tooltip>
               </Box>
               <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                • Thumbnail must be 1:1 aspect ratio and under 15MB
+                • Thumbnail must be 1:1 aspect ratio, keep estimated Metadata Size under 32Kb
               </Typography>
             </Grid>
             <Grid size={12}>
