@@ -1,9 +1,7 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/MintBurnTransfer/Mint.js
-  Summary: Fully‑on‑chain NFT mint form – auto‑resets on contract change,
-           blocks wheel / swipe drift on number inputs, supports **all v2
-           variants (v2a‑e)** for edition count, and shows editions in the
-           confirmation dialog.
+  Summary: Fully‑on‑chain NFT mint form – tags & description now optional
+           (shows advisory snackbars only), all other behaviour unchanged.
 */
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -215,7 +213,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const buildMetadata = () => {
     const m = new MichelsonMap();
     m.set('name', '0x' + stringToHex(formData.name));
-    m.set('description', '0x' + stringToHex(formData.description));
+    if (formData.description.trim())
+      m.set('description', '0x' + stringToHex(formData.description));
     m.set('artifactUri', '0x' + stringToHex(artifactDataUrl || ''));
     m.set(
       'creators',
@@ -262,7 +261,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
 
   /* ── validation ─────────────────────────────────────────────── */
   const validateForm = () => {
-    const required = ['name', 'description', 'creators', 'toAddress', 'license'];
+    const required = ['name', 'creators', 'toAddress', 'license'];
     for (const f of required) {
       if (!formData[f].trim()) {
         snack(`${f} is required`);
@@ -285,7 +284,12 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       return snack(`Royalties must be between 0 and ${MAX_ROYALTIES}%`);
     if (!artifactFile || !artifactDataUrl)
       return snack('Artifact file must be uploaded');
-    if (tags.length === 0) return snack('At least one tag is required');
+
+    /* Advisory warnings (but do NOT block) */
+    if (!formData.description.trim())
+      snack('Description is empty – recommended for marketplace visibility', 'info');
+    if (tags.length === 0)
+      snack('No tags provided – recommended for discoverability', 'info');
 
     /* recognise every v2 variant + v3 for edition amount */
     if (
