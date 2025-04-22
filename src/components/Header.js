@@ -1,8 +1,9 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/Header.js
-  Summary: Responsive Header with a cleaner mobile layout. Network selector is placed in the drawer on mobile, 
-           keeping the top bar uncluttered. Desktop remains a single row with menu items, network, and wallet button.
+  Summary: Added light☀️/dark🌙 toggle button in toolbar & mobile drawer,
+           wired to ColorModeContext. Keeps responsive layout intact.
 */
+
 import React, { useContext, useState } from 'react';
 import {
   AppBar,
@@ -24,8 +25,11 @@ import {
 import { styled, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
 import Link from 'next/link';
 import { WalletContext } from '../contexts/WalletContext';
+import ColorModeContext from '../contexts/ColorModeContext';
 
 const Logo = styled('img')({
   width: 40,
@@ -42,6 +46,7 @@ export default function Header() {
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const { walletAddress, isWalletConnected, connectWallet, disconnectWallet, network } =
     useContext(WalletContext);
+  const { mode, toggleColorMode } = useContext(ColorModeContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const menuItems = [
@@ -80,15 +85,10 @@ export default function Header() {
             justifyContent: 'space-between',
           }}
         >
+          {/* Left cluster – logo & hamburger */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {/* Hamburger menu on mobile */}
             {isMobile && (
-              <IconButton
-                color="inherit"
-                edge="start"
-                onClick={toggleDrawer(true)}
-                sx={{ mr: 1 }}
-              >
+              <IconButton color="inherit" edge="start" onClick={toggleDrawer(true)} sx={{ mr: 1 }}>
                 <MenuIcon />
               </IconButton>
             )}
@@ -107,7 +107,7 @@ export default function Header() {
             </Link>
           </Box>
 
-          {/* Desktop Navigation */}
+          {/* Desktop nav */}
           {!isMobile && (
             <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, ml: 2 }}>
               {menuItems.map((i) => (
@@ -118,8 +118,17 @@ export default function Header() {
             </Box>
           )}
 
-          {/* Right side: either wallet + network on desktop, or just wallet on mobile */}
+          {/* Right cluster – theme switcher, network selector, wallet */}
           <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
+            <IconButton
+              aria-label="Toggle light/dark mode"
+              color="inherit"
+              onClick={toggleColorMode}
+              sx={{ mr: isMobile ? 0 : 1 }}
+            >
+              {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+            </IconButton>
+
             {!isMobile && (
               <FormControl variant="standard" sx={{ minWidth: 90, mr: 2 }}>
                 <InputLabel sx={{ color: '#fff' }}>Network</InputLabel>
@@ -153,7 +162,6 @@ export default function Header() {
       {/* Mobile Drawer */}
       <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
         <Box sx={{ width: 250, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          {/* Navigation links */}
           <Box sx={{ flex: '1 1 auto' }} onClick={toggleDrawer(false)} onKeyDown={toggleDrawer(false)}>
             {menuItems.map((i) => (
               <Link key={i.text} href={i.link} legacyBehavior passHref>
@@ -164,7 +172,12 @@ export default function Header() {
             ))}
             <Divider sx={{ my: 1 }} />
 
-            {/* Mobile Network Selector */}
+            {/* Mobile‑specific items */}
+            <ListItemButton onClick={toggleColorMode}>
+              <ListItemText primary={mode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'} />
+              {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
+            </ListItemButton>
+
             <Box sx={{ px: 2, py: 1 }}>
               <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
                 Select Network
@@ -177,8 +190,6 @@ export default function Header() {
               </FormControl>
             </Box>
           </Box>
-
-          {/* Optional bottom area if needed */}
           <Box sx={{ flexShrink: 0 }} />
         </Box>
       </Drawer>

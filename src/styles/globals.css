@@ -1,6 +1,7 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/styles/globals.css
-  Summary: Global reset + mobile fixes for Beacon modal & page padding
+  Summary: Global reset – remove hard‑coded light background so MUI dark
+           mode can control colours.
 */
 html,body{
   margin:0;
@@ -10,7 +11,7 @@ html,body{
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
   overflow-x:hidden;               /* kill horizontal scroll on narrow screens */
-  background:#fafafa;              /* light neutral bg to hide “letter‑boxing” */
+  /* background handled by MUI theme → CssBaseline */
 }
 code{
   font-family:source-code-pro,Menlo,Monaco,Consolas,'Courier New',monospace;

@@ -1,6 +1,7 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/MintBurnTransfer/MintBurnTransfer.js
-  Summary: Unified Ghostnet/Mainnet carousels + manual loader + polished action layout
+  Summary: Unified Ghostnet/Mainnet carousels + manual loader + polished action
+           layout. Dark‑mode contrast fix for disclaimer banner.
 */
 import React, { useState, useContext, useRef, useEffect, useCallback } from 'react';
 import styled from '@emotion/styled';
@@ -43,13 +44,23 @@ const StyledPaper = styled(Paper)`
   width: 95%;
   box-sizing: border-box;
 `;
-const Disclaimer = styled('div')`
-  margin-top: 20px;
-  padding: 10px;
-  background-color: #fff8e1;
-  border-left: 6px solid #ffeb3b;
-  box-sizing: border-box;
-`;
+
+/* Dark‑mode aware disclaimer
+   • light mode  → unchanged (#fff8e1)
+   • dark  mode  → uses theme.palette.warning.dark for bg + auto contrast text */
+const Disclaimer = styled('div')(({ theme }) => ({
+  marginTop: 20,
+  padding: 10,
+  backgroundColor:
+    theme.palette.mode === 'dark' ? theme.palette.warning.dark : '#fff8e1',
+  color:
+    theme.palette.mode === 'dark'
+      ? theme.palette.getContrastText(theme.palette.warning.dark)
+      : theme.palette.text.primary,
+  borderLeft: `6px solid ${theme.palette.warning.main}`,
+  boxSizing: 'border-box',
+}));
+
 const LoadingGraphic = styled(Box)`
   text-align: center;
   padding: 40px 0;
@@ -308,7 +319,7 @@ const MintBurnTransfer = () => {
           <strong>Disclaimer:</strong> Use at your own risk. You are on {network}.
         </Typography>
       </Disclaimer>
-
+      
       {/* Originated Carousel */}
       <Typography variant="h6" sx={{ mt: 3 }}>My Originated Contracts</Typography>
       {origLoading ? (
