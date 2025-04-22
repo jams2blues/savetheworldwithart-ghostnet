@@ -1,8 +1,10 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: GenerateContract – form to deploy a new on-chain NFT contract (V3 only) with form validation, fee estimation and deployment.
-           After deployment, a popup displays the deployed KT1 address with a copy button that uses a unified, focus‑safe clipboard copy handler.
+  Summary: Deploy V3 contracts with rich validation, fee‑estimation fallback,
+           auto‑prefill of author/creator with the connected wallet, upgraded
+           to MUI Grid v2 (size prop) and safer NFT preview handling.
 */
+
 import React, { useState, useEffect, useContext, useMemo } from 'react';
 import styled from '@emotion/styled';
 import {
@@ -37,7 +39,7 @@ import FileUpload from './FileUpload';
 import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
 
-/* Styled Containers */
+/* ─── styled helpers ───────────────────────────────────────────── */
 const Container = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
@@ -46,11 +48,9 @@ const Container = styled(Paper)`
   box-sizing: border-box;
   border-radius: 8px;
 `;
-
 const Section = styled('div')`
   margin-bottom: 30px;
 `;
-
 const Pre = styled('pre')`
   background-color: #f5f5f5;
   padding: 10px;
@@ -61,62 +61,32 @@ const Pre = styled('pre')`
   font-size: 0.9rem;
 `;
 
-/* Helper Functions */
+/* ─── misc utils ───────────────────────────────────────────────── */
 const stringToHex = (str) =>
   [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
-
-const isValidTezosAddress = (address) => {
-  const regex = /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/;
-  return regex.test(address);
-};
-
-const getByteSize = (dataUri) => {
+const isValidTezosAddress = (a) => /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
+const getByteSize = (u) => {
   try {
-    const base64Data = dataUri.split(',')[1];
-    if (!base64Data) return 0;
-    const padding = (base64Data.match(/=+$/) || [''])[0].length;
-    return Math.floor((base64Data.length * 3) / 4) - padding;
-  } catch (error) {
-    console.error('Error calculating byte size:', error);
+    const b64 = u.split(',')[1] || '';
+    const pad = (b64.match(/=+$/) || [''])[0].length;
+    return Math.floor((b64.length * 3) / 4) - pad;
+  } catch {
     return 0;
   }
 };
-
-/**
- * Robust helper to copy text to the clipboard.
- * It first tries navigator.clipboard.writeText.
- * Then it falls back to using a temporary textarea with document.execCommand('copy').
- */
-const copyToClipboard = async (text) => {
-  try {
-    if (navigator.permissions && navigator.permissions.query) {
-      const { state } = await navigator.permissions.query({ name: 'clipboard-write' });
-      if (state === 'granted' || state === 'prompt') {
-        await navigator.clipboard.writeText(text);
-        return true;
-      }
-    }
-  } catch (permErr) {
-    console.warn('Clipboard permission error:', permErr);
-  }
-  try {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    const successful = document.execCommand('copy');
-    document.body.removeChild(textarea);
-    return successful;
-  } catch (execErr) {
-    console.error('Fallback copy error:', execErr);
-    return false;
-  }
+/* user‑friendly error explainer */
+const explainTezosError = (err) => {
+  if (!err?.message) return 'Unknown error';
+  const m = err.message.toLowerCase();
+  if (m.includes('oversized operation')) return 'Contract metadata exceeds protocol size limits';
+  if (m.includes('not enough tez') || m.includes('balance')) return 'Wallet balance too low for fees + storage';
+  if (m.includes('forbidden') || m.includes('cors')) return 'RPC node rejected the request (CORS / auth)';
+  if (m.includes('502') || m.includes('bad gateway')) return 'RPC node temporarily unavailable';
+  if (m.includes('expired') || m.includes('proposal expired')) return 'Wallet session expired – reconnect the wallet';
+  return err.message;
 };
 
-/* Constants & Storage Builder */
+/* ─── on‑chain constants ───────────────────────────────────────── */
 const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
 const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
 const CONTENT_KEY = 'content';
@@ -124,15 +94,24 @@ const STORAGE_COST_PER_BYTE = 0.00025;
 const OVERHEAD_BYTES = 5960;
 const MAX_METADATA_SIZE = 32768;
 
-const getV3Storage = (walletAddress, metadataMap) => ({
-  admin: walletAddress,
+/* Tooltip file‑types */
+const supportedFiletypesList = [
+  'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/apng',
+  'image/svg+xml', 'image/webp',
+  'video/mp4', 'video/ogg', 'video/quicktime', 'video/webm',
+  'text/plain', 'application/json', 'text/html',
+];
+
+/* V3 storage factory */
+const getV3Storage = (addr, meta) => ({
+  admin: addr,
   all_tokens: 0,
   children: [],
   collaborators: [],
-  contract_id: "0x" + stringToHex("ZeroContract"),
+  contract_id: '0x' + stringToHex('ZeroContract'),
   ledger: new MichelsonMap(),
   lock: false,
-  metadata: metadataMap,
+  metadata: meta,
   next_token_id: 0,
   operators: new MichelsonMap(),
   parents: [],
@@ -140,9 +119,11 @@ const getV3Storage = (walletAddress, metadataMap) => ({
   total_supply: new MichelsonMap(),
 });
 
-/* Component */
+/* ─── main component ───────────────────────────────────────────── */
 const GenerateContract = () => {
   const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
+
+  /* ── form / UI state ──────────────────────────── */
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -161,423 +142,266 @@ const GenerateContract = () => {
   const [modifiedMichelsonCode, setModifiedMichelsonCode] = useState('');
   const [confirmDialog, setConfirmDialog] = useState({ open: false, data: null });
   const [contractDetailsDialogOpen, setContractDetailsDialogOpen] = useState(false);
-  const [michelsonCode, setMichelsonCode] = useState('');
-  const [estimatedFeeTez, setEstimatedFeeTez] = useState(null);
-  const [estimatedGasLimit, setEstimatedGasLimit] = useState(null);
-  const [estimatedStorageLimit, setEstimatedStorageLimit] = useState(null);
-  const [estimatedBalanceChangeTez, setEstimatedBalanceChangeTez] = useState(null);
 
-  // Note: The deployed contract address (KT1) is stored in contractAddress.
-  // We use the same copy handler in both the Step 2 section and the popup.
-  const [kt1, setKt1] = useState('');
-
-  const supportedFiletypesList = [
-    'image/bmp','image/gif','image/jpeg','image/png','image/apng','image/svg+xml','image/webp',
-    'video/mp4','video/ogg','video/quicktime','video/webm','text/plain','application/json'
-  ];
-
-  // Fetch Michelson code once wallet is connected
+  /* autofill author/creator when wallet connects (user editable) */
   useEffect(() => {
-    const fetchMichelson = async () => {
+    if (!walletAddress) return;
+    setFormData((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      if (!next.authorAddresses.trim()) { next.authorAddresses = walletAddress; changed = true; }
+      if (!next.creators.trim()) { next.creators = walletAddress; changed = true; }
+      return changed ? next : prev;
+    });
+  }, [walletAddress]);
+
+  /* fee estimate snapshot */
+  const [est, setEst] = useState({
+    feeTez: null, gas: null, storage: null,
+    storageCostTez: null, totalCostTez: null, balanceChangeTez: null,
+  });
+
+  /* fetch Michelson */
+  const [michelsonCode, setMichelsonCode] = useState('');
+  useEffect(() => {
+    const fetchMich = async () => {
       try {
-        const response = await fetch('/contracts/Zero_Contract_V3.tz');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const code = await response.text();
-        setMichelsonCode(code);
-      } catch (error) {
-        console.error('Error fetching Michelson code:', error);
-        setSnackbar({ open: true, message: 'Failed to load Michelson code.', severity: 'error' });
-        setMichelsonCode('');
+        const res = await fetch('/contracts/Zero_Contract_V3.tz');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setMichelsonCode(await res.text());
+      } catch (e) {
+        console.error(e);
+        setSnackbar({ open: true, message: 'Unable to load contract source', severity: 'error' });
       }
     };
+    if (isWalletConnected && walletAddress) fetchMich();
+    else setMichelsonCode('');
+  }, [isWalletConnected, walletAddress]);
 
-    if (isWalletConnected && walletAddress) {
-      fetchMichelson();
-    } else {
-      setMichelsonCode('');
-    }
-  }, [walletAddress, isWalletConnected]);
+  /* strip control chars in description */
+  const sanitize = (s) =>
+    [...s].filter((c) => {
+      const code = c.charCodeAt(0);
+      return (code >= 0x20 && code <= 0x7e) || (code >= 0xa0 && code <= 0xff);
+    }).join('');
 
-  const removeControlChars = (str) => {
-    let sanitized = '';
-    for (let i = 0; i < str.length; i++) {
-      const code = str.charCodeAt(i);
-      if ((code >= 0x20 && code <= 0x7E) || (code >= 0xA0 && code <= 0xFF)) {
-        sanitized += str[i];
-      }
-    }
-    return sanitized;
-  };
-
+  /* handle form changes */
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const newValue = type === 'checkbox' ? checked : value;
-    const finalValue = name === 'description' ? removeControlChars(newValue) : newValue;
-    setFormData((prev) => ({ ...prev, [name]: finalValue }));
-    const error = validateField(name, finalValue);
-    setFormErrors((prev) => ({ ...prev, [name]: error }));
+    const val = type === 'checkbox' ? checked : value;
+    const safeVal = name === 'description' ? sanitize(val) : val;
+    setFormData((p) => ({ ...p, [name]: safeVal }));
+    setFormErrors((p) => ({ ...p, [name]: validateField(name, safeVal) }));
   };
 
-  // Build metadata preview using formData
+  /* validation rules */
+  const validateField = (field, val) => {
+    switch (field) {
+      case 'name': return !val ? 'Name required' : val.length > 30 ? 'Max 30 chars' : '';
+      case 'description': return !val ? 'Description required' : val.length > 250 ? 'Max 250 chars' : '';
+      case 'symbol': return !val ? 'Symbol required' : !/^[A-Za-z0-9]{3,5}$/.test(val) ? '3‑5 alphanumerics' : '';
+      case 'authors': return !val ? 'Authors required' : val.length > 50 ? 'Max 50 chars' : '';
+      case 'authorAddresses': {
+        const auth = formData.authors.split(',').map((x) => x.trim()).filter(Boolean);
+        const addrs = val.split(',').map((x) => x.trim()).filter(Boolean);
+        if (auth.length !== addrs.length) return 'Authors / addresses mismatch';
+        if (addrs.some((a) => !isValidTezosAddress(a))) return 'Invalid address';
+        return '';
+      }
+      case 'creators': return !val ? 'Creators required' : '';
+      case 'imageUri': return !val ? 'Thumbnail required' : '';
+      case 'agreeToTerms': return val ? '' : 'Must accept terms';
+      default: return '';
+    }
+  };
+  const validateForm = () => {
+    const errs = {};
+    Object.keys(formData).forEach((f) => {
+      const er = validateField(f, formData[f]);
+      if (er) errs[f] = er;
+    });
+    setFormErrors(errs);
+    return !Object.keys(errs).length;
+  };
+
+  /* thumbnail upload */
+  const handleThumbnailUpload = (uri) => {
+    setFormData((p) => ({ ...p, imageUri: uri || '' }));
+    setFormErrors((p) => ({ ...p, imageUri: validateField('imageUri', uri || '') }));
+  };
+
+  /* metadata preview */
   const metadataPreview = useMemo(() => ({
-    name: formData.name || "",
-    description: formData.description || "",
+    name: formData.name,
+    description: formData.description,
     interfaces: ['TZIP-012', 'TZIP-016'],
-    authors: formData.authors ? formData.authors.split(',').map(a => a.trim()).filter(Boolean) : [],
-    authoraddress: formData.authorAddresses ? formData.authorAddresses.split(',').map(a => a.trim()).filter(Boolean) : [],
-    symbol: formData.symbol || "",
-    creators: formData.creators ? formData.creators.split(',').map(a => a.trim()).filter(Boolean) : [],
-    type: formData.type || "",
-    imageUri: formData.imageUri || "",
+    authors: formData.authors.split(',').map((x) => x.trim()).filter(Boolean),
+    authoraddress: formData.authorAddresses.split(',').map((x) => x.trim()).filter(Boolean),
+    symbol: formData.symbol,
+    creators: formData.creators.split(',').map((x) => x.trim()).filter(Boolean),
+    type: formData.type,
+    imageUri: formData.imageUri || '',
   }), [formData]);
 
-  // Compute live metadata size
   const metadataSize = useMemo(() => {
-    const metadataJson = JSON.stringify(metadataPreview);
-    const metadataHex = stringToHex(metadataJson);
-    return metadataHex.length / 2 + OVERHEAD_BYTES;
+    const hex = stringToHex(JSON.stringify(metadataPreview));
+    return hex.length / 2 + OVERHEAD_BYTES;
   }, [metadataPreview]);
 
-  // Render metadata size indicator
   const renderMetadataSizeIndicator = () => (
-    <Typography variant="body2" sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
-      Estimated Metadata Size: {Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
+    <Typography variant="body2"
+      sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
+      Estimated Metadata Size:&nbsp;{Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
     </Typography>
   );
 
-  const validateField = (field, value) => {
-    let err = '';
-    switch (field) {
-      case 'name':
-        if (!value) err = 'Name is required.';
-        else if (value.length > 30) err = 'Max 30 characters.';
-        break;
-      case 'description':
-        if (!value) err = 'Description is required.';
-        else if (value.length > 250) err = 'Max 250 characters.';
-        break;
-      case 'symbol':
-        if (!value) err = 'Symbol is required.';
-        else if (value.length < 3) err = 'Min 3 characters.';
-        else if (value.length > 5) err = 'Max 5 characters.';
-        else {
-          const pattern = /^[A-Za-z0-9]{3,5}$/;
-          if (!pattern.test(value)) err = 'Letters and numbers only.';
-        }
-        break;
-      case 'creators':
-        if (!value) err = 'Creator(s) required.';
-        else if (value.length > 200) err = 'Max 200 characters.';
-        break;
-      case 'authors':
-        if (!value) err = 'Author(s) required.';
-        else if (value.length > 50) err = 'Max 50 characters.';
-        break;
-      case 'authorAddresses': {
-        const authors = formData.authors.split(',').map(a => a.trim()).filter(Boolean);
-        const addresses = value.split(',').map(a => a.trim()).filter(Boolean);
-        if (authors.length !== addresses.length) err = 'Authors and addresses count must match.';
-        else addresses.forEach(addr => {
-          if (!isValidTezosAddress(addr)) err = `Invalid address: ${addr}`;
-        });
-        break;
-      }
-      case 'imageUri':
-        if (!value) err = 'Image URI required.';
-        break;
-      case 'agreeToTerms':
-        if (!value) err = 'Must agree to terms.';
-        break;
-      default:
-        break;
-    }
-    return err;
-  };
-
-  const validateForm = () => {
-    const errors = {};
-    Object.keys(formData).forEach((field) => {
-      const err = validateField(field, formData[field]);
-      if (err) errors[field] = err;
-    });
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleThumbnailUpload = (dataUri) => {
-    setFormData((prev) => ({ ...prev, imageUri: dataUri }));
-    const err = validateField('imageUri', dataUri);
-    setFormErrors((prev) => ({ ...prev, imageUri: err }));
-  };
-
-  // Generate contract by setting modifiedMichelsonCode, but do not throw if Michelson is not ready
+  /* rebuild contract code when valid */
   useEffect(() => {
-    const generateContract = async () => {
-      if (!validateForm()) {
-        setModifiedMichelsonCode('');
-        return;
-      }
-      if (!michelsonCode) {
-        console.warn('Michelson code not set yet; skipping contract generation.');
-        return;
-      }
-      try {
-        setModifiedMichelsonCode(michelsonCode);
-        setSnackbar({ open: true, message: 'Contract generated.', severity: 'success' });
-      } catch (error) {
-        console.error('Error generating contract:', error);
-        setSnackbar({ open: true, message: 'Error generating contract. Please try again.', severity: 'error' });
-        setModifiedMichelsonCode('');
-      }
-    };
-    generateContract();
+    if (!michelsonCode || !validateForm()) { setModifiedMichelsonCode(''); return; }
+    setModifiedMichelsonCode(michelsonCode); // placeholder for future injections
   }, [formData, michelsonCode]);
 
-  // Popup copy handler: uses copyToClipboard to copy the deployed KT1 address.
-  const handlePopupCopy = async () => {
-    if (!contractAddress) return;
-    const ok = await copyToClipboard(contractAddress);
-    setSnackbar({
-      open: true,
-      message: ok ? 'Contract address copied!' : 'Failed to copy address.',
-      severity: ok ? 'success' : 'error',
-    });
+  /* copy helper */
+  const copyToClipboard = async (txt) => {
+    try {
+      await navigator.clipboard.writeText(txt);
+      return true;
+    } catch {
+      try {
+        const t = document.createElement('textarea');
+        t.value = txt;
+        t.style.position = 'fixed';
+        t.style.opacity = '0';
+        document.body.appendChild(t);
+        t.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(t);
+        return ok;
+      } catch { return false; }
+    }
   };
 
-  // Handle deployment
+  /* DEPLOY handler */
   const handleDeployContract = async () => {
-    if (!validateForm()) {
-      setSnackbar({ open: true, message: 'Fix errors before deploying.', severity: 'error' });
-      return;
-    }
-    if (!isWalletConnected) {
-      setSnackbar({ open: true, message: 'Connect wallet first.', severity: 'error' });
-      return;
-    }
-    if (!walletAddress) {
-      setSnackbar({ open: true, message: 'Wallet address undefined.', severity: 'error' });
-      return;
-    }
-    if (!modifiedMichelsonCode) {
-      setSnackbar({ open: true, message: 'Generate contract first.', severity: 'warning' });
-      return;
-    }
-    if (metadataSize > MAX_METADATA_SIZE) {
-      setSnackbar({
-        open: true,
-        message: `Metadata size (${Math.floor(metadataSize)} bytes) exceeds the maximum allowed (${MAX_METADATA_SIZE} bytes). Please reduce file or text data.`,
-        severity: 'error',
-      });
-      return;
-    }
+    if (!validateForm()) { setSnackbar({ open: true, message: 'Fix validation errors first', severity: 'error' }); return; }
+    if (!isWalletConnected || !walletAddress) { setSnackbar({ open: true, message: 'Connect your wallet first', severity: 'warning' }); return; }
+    if (!modifiedMichelsonCode) { setSnackbar({ open: true, message: 'Generate the contract first', severity: 'warning' }); return; }
+    if (metadataSize > MAX_METADATA_SIZE) { setSnackbar({ open: true, message: `Metadata ${Math.floor(metadataSize)} B exceeds 32 KB limit`, severity: 'error' }); return; }
+
     setDeploying(true);
-    setSnackbar({ open: true, message: 'Estimating fees...', severity: 'info' });
+    setSnackbar({ open: true, message: 'Estimating fees…', severity: 'info' });
+
+    /* storage build */
+    const metaHex = stringToHex(JSON.stringify(metadataPreview));
+    const mdMap = new MichelsonMap();
+    mdMap.set('', TEZOS_STORAGE_CONTENT_HEX);
+    mdMap.set(CONTENT_KEY, metaHex);
+    const storage = getV3Storage(walletAddress, mdMap);
+
     try {
-      const metadataObj = {
-        name: formData.name,
-        description: formData.description,
-        interfaces: ['TZIP-012', 'TZIP-016'],
-        authors: formData.authors.split(',').map(a => a.trim()).filter(Boolean),
-        authoraddress: formData.authorAddresses.split(',').map(a => a.trim()).filter(Boolean),
-        symbol: formData.symbol,
-        creators: formData.creators.split(',').map(a => a.trim()).filter(Boolean),
-        type: formData.type,
-        imageUri: formData.imageUri,
-      };
-      const jsonString = JSON.stringify(metadataObj);
-      const metadataHex = stringToHex(jsonString);
+      const bal = new BigNumber((await tezos.tz.getBalance(walletAddress)).toNumber()).dividedBy(1e6);
 
-      const metadataMap = new MichelsonMap();
-      metadataMap.set('', TEZOS_STORAGE_CONTENT_HEX);
-      metadataMap.set(CONTENT_KEY, metadataHex);
+      const estRaw = await tezos.estimate.originate({ code: modifiedMichelsonCode, storage });
+      const feeTez = new BigNumber(estRaw.suggestedFeeMutez).dividedBy(1e6).toFixed(6);
+      const storLim = estRaw.storageLimit;
+      const gasLim = estRaw.gasLimit;
+      const storCost = new BigNumber(storLim).times(STORAGE_COST_PER_BYTE).toFixed(6);
+      const total = new BigNumber(feeTez).plus(storCost).toFixed(6);
 
-      const storage = getV3Storage(walletAddress, metadataMap);
-      console.log('Storage Object:', storage);
-
-      const balanceMutez = await tezos.tz.getBalance(walletAddress);
-      const balanceTez = new BigNumber(balanceMutez.toNumber()).dividedBy(1e6);
-
-      const originationEstimation = await tezos.estimate.originate({
-        code: modifiedMichelsonCode,
-        storage,
-      });
-      const feeMutez = originationEstimation.suggestedFeeMutez;
-      const gasLimit = originationEstimation.gasLimit;
-      const storageLimit = originationEstimation.storageLimit;
-      const feeTez = new BigNumber(feeMutez).dividedBy(1e6).toFixed(6);
-      setEstimatedFeeTez(feeTez);
-      setEstimatedGasLimit(gasLimit);
-      setEstimatedStorageLimit(storageLimit);
-
-      const storageCostTez = new BigNumber(storageLimit).multipliedBy(STORAGE_COST_PER_BYTE).toFixed(6);
-      const totalCost = new BigNumber(feeTez).plus(storageCostTez).toFixed(6);
-      const balanceChange = new BigNumber(totalCost).negated().toFixed(6);
-      setEstimatedBalanceChangeTez(balanceChange);
-
-      console.log('Fee:', feeTez, 'Gas:', gasLimit, 'Storage:', storageLimit);
-      console.log('Storage Cost:', storageCostTez, 'Total Cost:', totalCost, 'Balance Change:', balanceChange);
-
-      if (balanceTez.isLessThan(totalCost)) {
-        setSnackbar({ open: true, message: `Insufficient balance: Need at least ${totalCost} ꜩ.`, severity: 'error' });
-        setDeploying(false);
-        return;
+      if (bal.isLessThan(total)) {
+        setSnackbar({ open: true, message: `Insufficient balance: need ≥ ${total} ꜩ`, severity: 'error' });
+        setDeploying(false); return;
       }
-      setConfirmDialog({
-        open: true,
-        data: {
-          estimatedFeeTez: feeTez,
-          estimatedGasLimit: gasLimit,
-          estimatedStorageLimit: storageLimit,
-          storageCostTez: storageCostTez,
-          totalEstimatedCostTez: totalCost,
-          estimatedBalanceChangeTez: balanceChange,
-        },
+
+      setEst({
+        feeTez, gas: gasLim, storage: storLim,
+        storageCostTez: storCost, totalCostTez: total,
+        balanceChangeTez: new BigNumber(total).negated().toFixed(6),
       });
-    } catch (error) {
-      console.error('Fee estimation error:', error);
-      if (error.message && error.message.includes("Oversized operation")) {
-        setSnackbar({ open: true, message: 'Error: Operation size exceeds maximum allowed. Please reduce metadata size.', severity: 'error' });
-      } else {
-        setSnackbar({ open: true, message: 'Error estimating fees. Please try again.', severity: 'error' });
-      }
+      setConfirmDialog({ open: true, data: { estimationFailed: false } });
+    } catch (err) {
+      const friendly = explainTezosError(err);
+      setSnackbar({ open: true, message: `Fee estimation failed: ${friendly}. You may still proceed – wallet will show exact fees.`, severity: 'warning' });
+      setConfirmDialog({ open: true, data: { estimationFailed: true, reason: friendly } });
+    } finally {
       setDeploying(false);
     }
   };
 
-  // Confirm deployment and show Contract Details Popup
+  /* confirm & originate */
   const confirmDeployment = async () => {
     setConfirmDialog({ open: false, data: null });
     setDeploying(true);
-    setSnackbar({ open: true, message: 'Deploying contract...', severity: 'info' });
+    setSnackbar({ open: true, message: 'Deploying contract…', severity: 'info' });
+
+    const metaHex = stringToHex(JSON.stringify(metadataPreview));
+    const mdMap = new MichelsonMap();
+    mdMap.set('', TEZOS_STORAGE_CONTENT_HEX);
+    mdMap.set(CONTENT_KEY, metaHex);
+    const storage = getV3Storage(walletAddress, mdMap);
+
     try {
-      const metadataObj = {
-        name: formData.name,
-        description: formData.description,
-        interfaces: ['TZIP-012', 'TZIP-016'],
-        authors: formData.authors.split(',').map(a => a.trim()).filter(Boolean),
-        authoraddress: formData.authorAddresses.split(',').map(a => a.trim()).filter(Boolean),
-        symbol: formData.symbol,
-        creators: formData.creators.split(',').map(a => a.trim()).filter(Boolean),
-        type: formData.type,
-        imageUri: formData.imageUri,
-      };
-      const jsonString = JSON.stringify(metadataObj);
-      const metadataHex = stringToHex(jsonString);
+      const op = await tezos.wallet.originate({ code: modifiedMichelsonCode, storage }).send();
+      setSnackbar({ open: true, message: 'Awaiting confirmations…', severity: 'info' });
+      await op.confirmation();
 
-      const metadataMap = new MichelsonMap();
-      metadataMap.set('', TEZOS_STORAGE_CONTENT_HEX);
-      metadataMap.set(CONTENT_KEY, metadataHex);
-
-      const storage = getV3Storage(walletAddress, metadataMap);
-
-      const originationOp = await tezos.wallet.originate({
-        code: modifiedMichelsonCode,
-        storage,
-      }).send();
-
-      setSnackbar({ open: true, message: 'Awaiting confirmation...', severity: 'info' });
-      await originationOp.confirmation();
-      const contract = await originationOp.contract();
-      const deployedAddress = contract.address;
-      if (deployedAddress) {
-        setContractAddress(deployedAddress);
-        setSnackbar({ open: true, message: `Contract deployed at ${deployedAddress}`, severity: 'success' });
-        // Use the same KT1 address in both places.
-        setConfirmDialog({ open: false, data: null });
-        setDeploying(false);
-        // Open the popup dialog.
-        setContractDetailsDialogOpen(true);
-      } else {
-        setSnackbar({ open: true, message: 'Failed to retrieve contract address.', severity: 'error' });
-      }
-    } catch (error) {
-      console.error('Deployment error:', error);
-      if (error.name === 'AbortedBeaconError') {
-        setSnackbar({ open: true, message: 'Deployment aborted.', severity: 'warning' });
-      } else if (error?.data?.[0]?.with?.string) {
-        const errorMsg = error.data[0].with.string;
-        setSnackbar({ open: true, message: errorMsg.includes('balance_too_low') ? 'Insufficient balance.' : `Deployment error: ${errorMsg}`, severity: 'error' });
-      } else if (error.message) {
-        setSnackbar({ open: true, message: `Error deploying: ${error.message}`, severity: 'error' });
-      } else {
-        setSnackbar({ open: true, message: 'Deployment error. Try again.', severity: 'error' });
-      }
+      const kt1 = (await op.contract()).address;
+      setContractAddress(kt1);
+      setContractDetailsDialogOpen(true);
+      setSnackbar({ open: true, message: `Contract deployed at ${kt1}`, severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: `Deploy failed: ${explainTezosError(err)}`, severity: 'error' });
     } finally {
       setDeploying(false);
-      setEstimatedFeeTez(null);
-      setEstimatedGasLimit(null);
-      setEstimatedStorageLimit(null);
-      setEstimatedBalanceChangeTez(null);
+      setEst({ feeTez: null, gas: null, storage: null, storageCostTez: null, totalCostTez: null, balanceChangeTez: null });
     }
   };
 
-  const handleCloseDialog = () => setConfirmDialog({ open: false, data: null });
-  const handleCloseSnackbar = () => setSnackbar({ ...snackbar, open: false });
-  const handleCloseContractDetailsDialog = () => setContractDetailsDialogOpen(false);
+  /* misc closers */
+  const closeSnack = () => setSnackbar((p) => ({ ...p, open: false }));
+  const closeContractDlg = () => setContractDetailsDialogOpen(false);
 
+  /* warn before unload */
   useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (contractAddress) {
-        e.preventDefault();
-        e.returnValue = 'You have not copied your contract address. Are you sure you want to leave?';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    const h = (e) => { if (contractAddress) { e.preventDefault(); e.returnValue = ''; } };
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
   }, [contractAddress]);
 
+  /* ─── render UI──────────────────────────────────── */
   return (
     <Container elevation={3}>
+      {/* header */}
       <Typography variant="h4" align="center" gutterBottom>
-        Deploy Your On-Chain Tezos NFT Smart Contract
+        Deploy Your On‑Chain Tezos NFT Smart Contract
       </Typography>
       <Typography variant="h5" align="center" gutterBottom>
         NFT Collection Contract
       </Typography>
       <Typography variant="body1" align="center" gutterBottom>
-        Ready to mint your NFTs fully on-chain? Just fill in the details below, and we’ll handle the metadata magic,
-        swapping in your info and wallet address before deploying it on Tezos with Taquito. Big thanks to{' '}
-        <Link href="https://x.com/JestemZero" target="_blank" rel="noopener noreferrer" color="primary" underline="hover">
-          @JestemZero
-        </Link>{' '}
-        and{' '}
-        <Link href="https://x.com/jams2blues" target="_blank" rel="noopener noreferrer" color="primary" underline="hover">
-          @jams2blues
-        </Link>{' '}
-        for the late nights – powered by sheer willpower and love.
+        Ready to mint NFTs fully on‑chain? Fill in the details below and we’ll handle the metadata magic before deploying.
       </Typography>
 
-      {/* Liability Disclaimer */}
+      {/* disclaimer */}
       <Section>
         <Alert severity="warning">
           <Typography variant="body2">
-            <strong>Disclaimer:</strong> By deploying contracts and NFTs via this platform, you accept full
-            responsibility for your on-chain actions. On Tezos, contracts are immutable and cannot be deleted
-            or altered once deployed. We hold no liability for any content you create or deploy. Always test
-            thoroughly on{' '}
-            <Link href="https://ghostnet.savetheworldwithart.io" color="primary" underline="hover" target="_blank" rel="noopener noreferrer">
-              Ghostnet
-            </Link>{' '}
-            before deploying to mainnet.
+            <strong>Disclaimer:</strong> Deployments are <em>immutable</em>. Always test on Ghostnet before mainnet.
           </Typography>
         </Alert>
       </Section>
 
-      {/* Wallet Connection Status */}
+      {/* wallet status */}
       <Box sx={{ textAlign: 'center', mb: 2 }}>
-        {isWalletConnected ? (
-          <Typography variant="subtitle1">Wallet Connected: {walletAddress}</Typography>
-        ) : (
-          <Typography variant="subtitle1">Please connect your wallet to proceed.</Typography>
-        )}
+        {isWalletConnected
+          ? <Typography variant="subtitle1">Wallet: {walletAddress}</Typography>
+          : <Typography variant="subtitle1">Connect a wallet to continue</Typography>}
       </Box>
 
-      {/* Step 1: Fill Contract Details */}
+      {/* form */}
       <Section>
-        <Typography variant="h6" gutterBottom>
-          Step 1: Fill in Your Collection Details
-        </Typography>
-        <form noValidate autoComplete="off">
+        <Typography variant="h6" gutterBottom>Step 1 · Collection Details</Typography>
+        <form noValidate>
           <Grid container spacing={2}>
             <Grid size={12}>
               <TextField
@@ -593,6 +417,7 @@ const GenerateContract = () => {
                 error={!!formErrors.name}
               />
             </Grid>
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="NFT Symbol *"
@@ -603,10 +428,11 @@ const GenerateContract = () => {
                 placeholder="e.g. ZERO"
                 required
                 inputProps={{ maxLength: 5 }}
-                helperText={`${formData.symbol.length}/5 characters. Letters and numbers only.`}
+                helperText={`${formData.symbol.length}/5 characters · letters & numbers`}
                 error={!!formErrors.symbol}
               />
             </Grid>
+
             <Grid size={12}>
               <TextField
                 label="NFT Collection Description *"
@@ -623,6 +449,7 @@ const GenerateContract = () => {
                 error={!!formErrors.description}
               />
             </Grid>
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Author(s) *"
@@ -637,6 +464,7 @@ const GenerateContract = () => {
                 error={!!formErrors.authors}
               />
             </Grid>
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Author Address(es) *"
@@ -644,13 +472,14 @@ const GenerateContract = () => {
                 value={formData.authorAddresses}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="Comma-separated Tezos addresses"
+                placeholder="Comma‑separated Tezos addresses"
                 required
                 inputProps={{ maxLength: 200 }}
-                helperText={`${formData.authorAddresses.length}/200 characters`}
+                helperText={`${formData.authorAddresses.length}/200 characters · defaults to your wallet if blank`}
                 error={!!formErrors.authorAddresses}
               />
             </Grid>
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Creator(s) *"
@@ -658,285 +487,163 @@ const GenerateContract = () => {
                 value={formData.creators}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="Comma-separated Tezos addresses"
+                placeholder="Comma‑separated Tezos addresses"
                 required
                 inputProps={{ maxLength: 200 }}
-                helperText={`${formData.creators.length}/200 characters`}
+                helperText={`${formData.creators.length}/200 characters · defaults to your wallet if blank`}
                 error={!!formErrors.creators}
               />
             </Grid>
+
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth margin="normal" error={!!formErrors.type}>
                 <InputLabel id="type-label">Type *</InputLabel>
-                <Select
-                  labelId="type-label"
-                  name="type"
-                  value={formData.type}
-                  onChange={handleInputChange}
-                  label="Type *"
-                >
+                <Select labelId="type-label" name="type" value={formData.type} onChange={handleInputChange} label="Type *">
                   <MenuItem value="art">Art</MenuItem>
                   <MenuItem value="music">Music</MenuItem>
                   <MenuItem value="collectible">Collectible</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
-                {formErrors.type && (
-                  <Typography variant="caption" color="error">
-                    {formErrors.type}
-                  </Typography>
-                )}
+                {!!formErrors.type && <Typography variant="caption" color="error">{formErrors.type}</Typography>}
               </FormControl>
             </Grid>
+
             <Grid size={12}>
               {renderMetadataSizeIndicator()}
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <FileUpload setArtifactData={handleThumbnailUpload} />
-                <Tooltip
-                  title={
-                    <>
-                      <Typography variant="subtitle2">Supported Filetypes:</Typography>
-                      <Typography variant="body2">{supportedFiletypesList.join(', ')}</Typography>
-                    </>
-                  }
-                  arrow
-                >
-                  <IconButton sx={{ ml: 1 }} aria-label="Supported Filetypes">
-                    <InfoIcon fontSize="small" />
-                  </IconButton>
+                <Tooltip title={<><Typography variant="subtitle2">Supported Filetypes:</Typography><Typography variant="body2">{supportedFiletypesList.join(', ')}</Typography></>} arrow>
+                  <IconButton sx={{ ml: 1 }} aria-label="Supported Filetypes"><InfoIcon fontSize="small" /></IconButton>
                 </Tooltip>
               </Box>
               <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                • Thumbnail must be 1:1 aspect ratio, keep estimated Metadata Size under 32Kb
+                • Thumbnail must be square · keep metadata under 32 KB
               </Typography>
             </Grid>
+
             <Grid size={12}>
               <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={formData.agreeToTerms}
-                    onChange={handleInputChange}
-                    name="agreeToTerms"
-                    color="primary"
-                  />
-                }
-                label={
-                  <span>
-                    I agree to the{' '}
-                    <Link href="/terms" target="_blank" rel="noopener noreferrer">
-                      Terms and Conditions
-                    </Link>
-                    .
-                  </span>
-                }
+                control={<Checkbox checked={formData.agreeToTerms} onChange={handleInputChange} name="agreeToTerms" color="primary" />}
+                label={<span>I agree to the <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>.</span>}
               />
-              {formErrors.agreeToTerms && (
-                <Typography variant="caption" color="error">
-                  {formErrors.agreeToTerms}
-                </Typography>
-              )}
+              {!!formErrors.agreeToTerms && <Typography variant="caption" color="error">{formErrors.agreeToTerms}</Typography>}
             </Grid>
           </Grid>
         </form>
       </Section>
 
-      {metadataPreview && (
+      {/* preview */}
+      {!!metadataPreview.imageUri && (
         <Section>
-          <Typography variant="subtitle1" gutterBottom>
-            Metadata Preview:
-          </Typography>
+          <Typography variant="subtitle1" gutterBottom>Metadata Preview:</Typography>
           <NFTPreview metadata={metadataPreview} />
         </Section>
       )}
 
+      {/* deploy button */}
       <Grid container spacing={2} sx={{ textAlign: 'center', mt: 2 }}>
         <Grid size={12}>
-          <Typography variant="caption" display="block" gutterBottom>
-            Get your collection on-chain so you can start minting!
-          </Typography>
+          <Typography variant="caption" display="block" gutterBottom>Get your collection on‑chain!</Typography>
           <Button
             variant="contained"
             color="primary"
             onClick={handleDeployContract}
-            disabled={deploying || !modifiedMichelsonCode || Object.keys(formErrors).length > 0}
+            disabled={deploying || !modifiedMichelsonCode || !!Object.keys(formErrors).length}
             startIcon={deploying && <CircularProgress size={20} />}
-            sx={{ maxWidth: '300px', mx: 'auto' }}
+            sx={{ maxWidth: 300, mx: 'auto' }}
           >
-            {deploying ? 'Deploying...' : 'Deploy Contract'}
+            {deploying ? 'Deploying…' : 'Deploy Contract'}
           </Button>
-          {estimatedFeeTez && (
+          {est.feeTez && (
             <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              Estimated Fees: {estimatedFeeTez} ꜩ
+              Estimated Fees: {est.feeTez} ꜩ
             </Typography>
           )}
         </Grid>
       </Grid>
 
+      {/* step 2 */}
       {contractAddress && (
         <Section>
-          <Typography variant="h6" gutterBottom>
-            Step 2: Your Contract is Deployed
-          </Typography>
-          <Typography variant="body2" gutterBottom>
-            Your contract has been successfully deployed. Below is your contract address.
-          </Typography>
+          <Typography variant="h6" gutterBottom>Step 2: Contract Deployed</Typography>
+          <Typography variant="body2">Your contract address:</Typography>
           <Pre>{contractAddress}</Pre>
-          <Button
-            variant="contained"
-            color="secondary"
+          <Button variant="contained" color="secondary" sx={{ mt: 1, maxWidth: 300, mx: 'auto' }}
             onClick={async () => {
               const ok = await copyToClipboard(contractAddress);
-              setSnackbar({
-                open: true,
-                message: ok ? 'Contract address copied!' : 'Failed to copy address.',
-                severity: ok ? 'success' : 'error',
-              });
-            }}
-            sx={{ mt: 1, maxWidth: '300px', mx: 'auto' }}
-          >
-            Copy Contract Address
+              setSnackbar({ open: true, message: ok ? 'Contract address copied!' : 'Copy failed', severity: ok ? 'success' : 'error' });
+            }}>
+            Copy Contract Address
           </Button>
           <Typography variant="body2" sx={{ mt: 1 }}>
-            Check your contract on{' '}
-            <Link
-              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
-              target="_blank"
-              rel="noopener noreferrer"
-              color="primary"
-              underline="hover"
-            >
-              Better Call Dev
-            </Link>{' '}
-            or{' '}
-            <Link
-              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              color="primary"
-              underline="hover"
-            >
-              OBJKT.com
-            </Link>.
+            View on&nbsp;
+            <Link href={`https://ghostnet.tzkt.io/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" underline="hover">view on TzKT</Link>
+            &nbsp;or&nbsp;
+            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" underline="hover">ghostnet.OBJKT.com</Link>.
           </Typography>
         </Section>
       )}
 
-      <Dialog
-        open={confirmDialog.open}
-        onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle id="confirm-deployment-title">Confirm Deployment</DialogTitle>
+      {/* confirm dialog */}
+      <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ open: false, data: null })} fullWidth maxWidth="sm">
+        <DialogTitle id="confirm-deployment-title">Confirm Deployment</DialogTitle>
         <DialogContent>
-          <DialogContentText id="confirm-deployment-description">
-            Are you sure you want to deploy this smart contract? This action is irreversible.
-            <br /><br />
-            <strong>Estimated Fee:</strong>{' '}
-            {confirmDialog.data ? `${confirmDialog.data.estimatedFeeTez} ꜩ` : 'Calculating...'}{' '}
-            <Tooltip title="The network fee required for deployment." arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle', cursor: 'pointer' }} />
-            </Tooltip>
-            <br />
-            <strong>Gas Limit:</strong>{' '}
-            {confirmDialog.data ? confirmDialog.data.estimatedGasLimit : 'Calculating...'}{' '}
-            <Tooltip title="Maximum allowed gas." arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle', cursor: 'pointer' }} />
-            </Tooltip>
-            <br />
-            <strong>Storage Limit:</strong>{' '}
-            {confirmDialog.data ? confirmDialog.data.estimatedStorageLimit : 'Calculating...'}{' '}
-            <Tooltip title="Maximum storage allocated." arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle', cursor: 'pointer' }} />
-            </Tooltip>
-            <br />
-            <strong>Storage Cost:</strong>{' '}
-            {confirmDialog.data ? `${confirmDialog.data.storageCostTez} ꜩ` : 'Calculating...'}{' '}
-            <Tooltip title="Cost to store contract data on-chain." arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle', cursor: 'pointer' }} />
-            </Tooltip>
-            <br />
-            <strong>Total Cost:</strong>{' '}
-            {confirmDialog.data ? `${confirmDialog.data.totalEstimatedCostTez} ꜩ` : 'Calculating...'}{' '}
-            <Tooltip title="Total fee + storage cost." arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle', cursor: 'pointer' }} />
-            </Tooltip>
-            <br />
-            <strong>Balance Change:</strong>{' '}
-            {confirmDialog.data ? `${confirmDialog.data.estimatedBalanceChangeTez} ꜩ` : 'Calculating...'}{' '}
-            <Tooltip title="Estimated change in your account balance after deployment." arrow>
-              <InfoIcon fontSize="small" sx={{ ml: 1, verticalAlign: 'middle', cursor: 'pointer' }} />
-            </Tooltip>
-          </DialogContentText>
-          <Typography variant="subtitle2" color="error" sx={{ mt: 1 }}>
-            **Please verify all information before proceeding.**
-          </Typography>
+          {confirmDialog.data?.estimationFailed ? (
+            <DialogContentText>
+              Fee estimation failed (<em>{confirmDialog.data.reason}</em>).<br />Sign in your wallet to see the exact fees.
+            </DialogContentText>
+          ) : (
+            <DialogContentText>
+              Are you sure you want to deploy? This action is irreversible.<br /><br />
+              <strong>Estimated Fee:</strong> {est.feeTez ?? '…'} ꜩ<br />
+              <strong>Gas Limit:</strong> {est.gas ?? '…'}<br />
+              <strong>Storage Limit:</strong> {est.storage ?? '…'}<br />
+              <strong>Storage Cost:</strong> {est.storageCostTez ?? '…'} ꜩ<br />
+              <strong>Total Cost:</strong> {est.totalCostTez ?? '…'} ꜩ<br />
+              <strong>Balance Change:</strong> {est.balanceChangeTez ?? '…'} ꜩ
+            </DialogContentText>
+          )}
+          <Typography variant="subtitle2" color="error" sx={{ mt: 1 }}>**Please verify all information before proceeding.**</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog({ ...confirmDialog, open: false })} color="secondary">
-            Cancel
-          </Button>
+          <Button onClick={() => setConfirmDialog({ open: false, data: null })} color="secondary">Cancel</Button>
           <Button onClick={confirmDeployment} color="primary" variant="contained" autoFocus>
-            Confirm Deployment
+            {confirmDialog.data?.estimationFailed ? 'Deploy Anyway' : 'Confirm Deployment'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog
-        open={contractDetailsDialogOpen}
-        onClose={handleCloseContractDetailsDialog}
-        fullWidth
-        maxWidth="sm"
-        disableEnforceFocus
-        disableAutoFocus
-      >
-        <DialogTitle>Contract Deployed Successfully</DialogTitle>
+      {/* deployed dialog */}
+      <Dialog open={contractDetailsDialogOpen} onClose={closeContractDlg} fullWidth maxWidth="sm" disableEnforceFocus disableAutoFocus>
+        <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            Your contract has been successfully deployed. Please copy your contract address and store it safely.
-          </DialogContentText>
+          <DialogContentText>Copy and store your contract address safely.</DialogContentText>
           <Pre>{contractAddress}</Pre>
           <Box sx={{ textAlign: 'center', my: 2 }}>
-            <Button variant="outlined" onClick={handlePopupCopy} sx={{ maxWidth: '300px', mx: 'auto' }}>
-              Copy Contract Address
+            <Button variant="outlined" onClick={async () => {
+              const ok = await copyToClipboard(contractAddress);
+              setSnackbar({ open: true, message: ok ? 'Copied!' : 'Copy failed', severity: ok ? 'success' : 'error' });
+            }} sx={{ maxWidth: 300, mx: 'auto' }}>
+              Copy Contract Address
             </Button>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2 }}>
-            <Link
-              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              underline="hover"
-              color="primary"
-            >
-              View on Ghostnet OBJKT
+            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" underline="hover" color="primary">
+              View on OBJKT
             </Link>
-            <Link
-              href={`https://better-call.dev/ghostnet/${contractAddress}/operations`}
-              target="_blank"
-              rel="noopener noreferrer"
-              underline="hover"
-              color="primary"
-            >
-              View on Better-Call.dev
+            <Link href={`https://ghostnet.tzkt.io/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" underline="hover" color="primary">
+              View on TzKT
             </Link>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseContractDetailsDialog} color="primary">
-            Close
-          </Button>
+          <Button onClick={closeContractDlg} color="primary">Close</Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
+      {/* global snackbar */}
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={closeSnack} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
+        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>
     </Container>
   );
