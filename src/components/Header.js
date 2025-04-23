@@ -1,26 +1,14 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/Header.js
-  Summary: Added light☀️/dark🌙 toggle button in toolbar & mobile drawer,
-           wired to ColorModeContext. Keeps responsive layout intact.
+  Summary: Toolbar with theme toggle, network selector (domain redirect)
+           and responsive drawer. Menu array fixed for SSR.
 */
 
 import React, { useContext, useState } from 'react';
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  IconButton,
-  Drawer,
-  ListItemButton,
-  ListItemText,
-  Box,
-  useMediaQuery,
-  MenuItem,
-  Select,
-  FormControl,
-  InputLabel,
-  Divider,
+  AppBar, Toolbar, Typography, Button, IconButton, Drawer,
+  ListItemButton, ListItemText, Box, useMediaQuery, MenuItem,
+  Select, FormControl, InputLabel, Divider
 } from '@mui/material';
 import { styled, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -31,48 +19,39 @@ import Link from 'next/link';
 import { WalletContext } from '../contexts/WalletContext';
 import ColorModeContext from '../contexts/ColorModeContext';
 
-const Logo = styled('img')({
-  width: 40,
-  height: 40,
-  marginRight: 8,
-});
+const Logo = styled('img')({ width: 40, height: 40, marginRight: 8 });
+const HeaderContainer = styled(AppBar)`background-color: darkgreen;`;
 
-const HeaderContainer = styled(AppBar)`
-  background-color: darkgreen;
-`;
+/* —— Primary nav links (declared outside the component for SSR) —— */
+const MENU_ITEMS = [
+  { text: 'Home',               link: '/' },
+  { text: 'Deploy Contract',    link: '/generate' },
+  { text: 'Mint/Burn/Transfer', link: '/mint-burn-transfer' },
+  { text: 'On-Chain License',   link: '/on-chain-license' },
+  { text: 'Terms',              link: '/terms' }
+];
 
-export default function Header() {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const { walletAddress, isWalletConnected, connectWallet, disconnectWallet, network } =
-    useContext(WalletContext);
+/* —— Domain redirect helper — replace URLs per-deployment —— */
+const redirectFor = (target) =>
+  target === 'ghostnet'
+    ? 'https://ghostnet.savetheworldwithart.io'
+    : 'https://savetheworldwithart.io';
+
+export default function Header () {
+  const theme     = useTheme();
+  const isMobile  = useMediaQuery(theme.breakpoints.down('sm'));
+  const { walletAddress, isWalletConnected,
+          connectWallet, disconnectWallet, network } = useContext(WalletContext);
   const { mode, toggleColorMode } = useContext(ColorModeContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const menuItems = [
-    { text: 'Home', link: '/' },
-    { text: 'Deploy Contract', link: '/generate' },
-    { text: 'Mint/Burn/Transfer', link: '/mint-burn-transfer' },
-    { text: 'On‑Chain License', link: '/on-chain-license' },
-    { text: 'Terms', link: '/terms' },
-  ];
+  const handleNetworkChange = (e) => { window.location.href = redirectFor(e.target.value); };
+  const toggleDrawer        = (open) => () => setDrawerOpen(open);
 
-  const handleNetworkChange = (e) => {
-    window.location.href =
-      e.target.value === 'ghostnet'
-        ? 'https://ghostnet.savetheworldwithart.io'
-        : 'https://savetheworldwithart.io';
-  };
-
-  const toggleDrawer = (open) => () => {
-    setDrawerOpen(open);
-  };
-
-  const walletLabel = () =>
+  const walletLabel  = () =>
     !isWalletConnected
       ? 'Connect Wallet'
-      : `Disconnect (${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)})`;
-
+      : `Disconnect (${walletAddress.slice(0,6)}…${walletAddress.slice(-4)})`;
   const walletAction = isWalletConnected ? disconnectWallet : connectWallet;
 
   return (
@@ -82,10 +61,10 @@ export default function Header() {
           sx={{
             minHeight: isMobile ? 60 : 64,
             px: isMobile ? 1 : 3,
-            justifyContent: 'space-between',
+            justifyContent: 'space-between'
           }}
         >
-          {/* Left cluster – logo & hamburger */}
+          {/* —— Left: logo & hamburger —— */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             {isMobile && (
               <IconButton color="inherit" edge="start" onClick={toggleDrawer(true)} sx={{ mr: 1 }}>
@@ -107,10 +86,10 @@ export default function Header() {
             </Link>
           </Box>
 
-          {/* Desktop nav */}
+          {/* —— Desktop nav —— */}
           {!isMobile && (
             <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, ml: 2 }}>
-              {menuItems.map((i) => (
+              {MENU_ITEMS.map((i) => (
                 <Link key={i.text} href={i.link} legacyBehavior passHref>
                   <Button sx={{ color: '#fff', mx: 1 }}>{i.text}</Button>
                 </Link>
@@ -118,7 +97,7 @@ export default function Header() {
             </Box>
           )}
 
-          {/* Right cluster – theme switcher, network selector, wallet */}
+          {/* —— Right: theme, network, wallet —— */}
           <Box sx={{ display: 'flex', alignItems: 'center', ml: 'auto' }}>
             <IconButton
               aria-label="Toggle light/dark mode"
@@ -143,6 +122,7 @@ export default function Header() {
                 </Select>
               </FormControl>
             )}
+
             <Button
               color="inherit"
               onClick={walletAction}
@@ -151,7 +131,7 @@ export default function Header() {
             >
               {isMobile
                 ? isWalletConnected
-                  ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
+                  ? `${walletAddress.slice(0,4)}…${walletAddress.slice(-4)}`
                   : 'Connect'
                 : walletLabel()}
             </Button>
@@ -159,20 +139,17 @@ export default function Header() {
         </Toolbar>
       </HeaderContainer>
 
-      {/* Mobile Drawer */}
+      {/* —— Mobile drawer —— */}
       <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
         <Box sx={{ width: 250, display: 'flex', flexDirection: 'column', height: '100%' }}>
           <Box sx={{ flex: '1 1 auto' }} onClick={toggleDrawer(false)} onKeyDown={toggleDrawer(false)}>
-            {menuItems.map((i) => (
+            {MENU_ITEMS.map((i) => (
               <Link key={i.text} href={i.link} legacyBehavior passHref>
-                <ListItemButton>
-                  <ListItemText primary={i.text} />
-                </ListItemButton>
+                <ListItemButton><ListItemText primary={i.text} /></ListItemButton>
               </Link>
             ))}
             <Divider sx={{ my: 1 }} />
 
-            {/* Mobile‑specific items */}
             <ListItemButton onClick={toggleColorMode}>
               <ListItemText primary={mode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'} />
               {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}

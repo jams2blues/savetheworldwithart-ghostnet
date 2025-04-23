@@ -1,16 +1,16 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/contexts/WalletContext.js
-  Summary: Wallet provider with automatic multi‑RPC fallback, Beacon
-           “Syncing stopped manually” patch, and new WalletConnect
-           “Proposal expired” patch. Public API unchanged.
+  Summary: Stable wallet provider with automatic RPC fallback &
+           Beacon / WalletConnect resiliency. No runtime net switch.
 */
+
 import React, { createContext, useState, useEffect } from 'react';
 import { TezosToolkit } from '@taquito/taquito';
 import { BeaconWallet } from '@taquito/beacon-wallet';
 import { BeaconEvent } from '@airgap/beacon-sdk';
 import { NETWORKS, DEFAULT_NETWORK } from '../config/networkConfig';
 
-/* ── Beacon “Syncing stopped manually” swallow (unchanged) ─────── */
+/* —— Beacon “Syncing stopped manually” swallow —— */
 if (typeof BeaconWallet !== 'undefined' && BeaconWallet.prototype) {
   const proto = BeaconWallet.prototype.client?.constructor?.prototype;
   if (proto) {
@@ -24,7 +24,7 @@ if (typeof BeaconWallet !== 'undefined' && BeaconWallet.prototype) {
   }
 }
 
-/* ── WalletConnect “Proposal expired” swallow (NEW) ─────────────── */
+/* —— WalletConnect “Proposal expired” swallow —— */
 if (typeof BeaconWallet !== 'undefined' && BeaconWallet.prototype?.client) {
   const wcClient = BeaconWallet.prototype.client.walletConnectClient;
   if (wcClient?.core?.pairing) {
@@ -36,7 +36,7 @@ if (typeof BeaconWallet !== 'undefined' && BeaconWallet.prototype?.client) {
   }
 }
 
-/* ── Context setup ─────────────────────────────────────────────── */
+/* —— Context setup —— */
 export const WalletContext = createContext();
 
 export const WalletProvider = ({ children }) => {
@@ -46,9 +46,9 @@ export const WalletProvider = ({ children }) => {
   const [wallet, setWallet]  = useState(null);
   const [walletAddress, setAddress] = useState('');
   const [isWalletConnected, setConnected] = useState(false);
-  const [activeRpc, setActiveRpc] = useState(netCfg.rpcUrl);
+  const [activeRpc, setActiveRpc] = useState(netCfg.rpcUrls[0]);
 
-  /* Probe RPC list (and optional override) until one passes CORS */
+  /* Probe RPC list (plus optional localStorage override) until one passes CORS */
   const pickRpc = async () => {
     const forced = localStorage.getItem('ZEROART_RPC');
     const pool = forced ? [forced, ...netCfg.rpcUrls] : netCfg.rpcUrls;
@@ -56,7 +56,8 @@ export const WalletProvider = ({ children }) => {
       try {
         const ctrl = new AbortController();
         const id   = setTimeout(() => ctrl.abort(), 3000);
-        const res  = await fetch(`${url}/chains/main/chain_id`, { mode: 'cors', signal: ctrl.signal });
+        const res  = await fetch(`${url}/chains/main/chain_id`,
+                                 { mode: 'cors', signal: ctrl.signal });
         clearTimeout(id);
         if (res.ok) return url;
       } catch {/* try next */}
@@ -71,13 +72,19 @@ export const WalletProvider = ({ children }) => {
         setActiveRpc(rpc);
 
         const tk = new TezosToolkit(rpc);
-        const bw = new BeaconWallet({ name: 'ZeroArt DApp', preferredNetwork: netCfg.type });
+        const bw = new BeaconWallet({
+          name: 'ZeroArt DApp',
+          preferredNetwork: netCfg.type
+        });
         tk.setWalletProvider(bw);
 
-        bw.client.subscribeToEvent(BeaconEvent.ACTIVE_ACCOUNT_SET, async (acc) => {
-          if (acc) { setAddress(await bw.getPKH()); setConnected(true); }
-          else     { setAddress('');               setConnected(false); }
-        });
+        bw.client.subscribeToEvent(
+          BeaconEvent.ACTIVE_ACCOUNT_SET,
+          async (acc) => {
+            if (acc) { setAddress(await bw.getPKH()); setConnected(true); }
+            else     { setAddress('');               setConnected(false); }
+          }
+        );
 
         const acc = await bw.client.getActiveAccount();
         if (acc) { setAddress(await bw.getPKH()); setConnected(true); }
@@ -89,12 +96,10 @@ export const WalletProvider = ({ children }) => {
         console.error('Wallet initialisation failed:', err.message);
       }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [netCfg.name]);
 
-  const connectWallet = async () =>
-    wallet?.requestPermissions({ network: { type: netCfg.type } });
-
+  const connectWallet    = () => wallet?.requestPermissions({ network: { type: netCfg.type } });
   const disconnectWallet = async () => {
     try { await wallet?.clearActiveAccount(); }
     finally { setAddress(''); setConnected(false); }
@@ -109,7 +114,7 @@ export const WalletProvider = ({ children }) => {
       network: netCfg.name,
       activeRpc,
       connectWallet,
-      disconnectWallet,
+      disconnectWallet
     }}>
       {children}
     </WalletContext.Provider>
