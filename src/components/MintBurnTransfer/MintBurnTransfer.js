@@ -72,8 +72,8 @@ const TZKT_BASE = {
   mainnet: 'https://api.tzkt.io/v1',
 };
 const HASHES = {
-  ghostnet: { v1: 943737041, v2a: -1889653220, v2b: -543526052, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
-  mainnet: { v1: 943737041, v2a: -1889653220, v2b: -543526052, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
+  ghostnet: { v1: -543526052, v2a: -1889653220, v2b: 943737041, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
+  mainnet: { v1: -543526052, v2a: -1889653220, v2b: 943737041, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
 };
 const makeHashList = (o) => Object.values(o).filter((n, i, arr) => arr.indexOf(n) === i).join(',');
 const getVersion = (net, hash) =>
