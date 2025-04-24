@@ -1,12 +1,25 @@
+# --- build artefacts -------------------------------------------------
 /node_modules
 /.next
-/coverage
 /build
+/coverage
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env
+
+# --- environment ----------------------------------------------------
+.env*
 yarn-debug.log*
 yarn-error.log*
+
+# --- Yarn 4 ----------------------------------------------------------
+.pnp.cjs
+.pnp.loader.mjs
+.yarn/cache/*
+.yarn/unplugged/*
+!.yarn/releases/*
+!.yarn/patches/*
+!.yarn/plugins/*
+!.yarn/sdks/*
+!.yarn/versions/*
+
+# --- misc ------------------------------------------------------------
+/.yarnrc.yml  # keep tracked if you prefer, otherwise ignore

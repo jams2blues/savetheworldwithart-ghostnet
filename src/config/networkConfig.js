@@ -8,12 +8,10 @@ import { NetworkType } from '@airgap/beacon-sdk';
 /* —— Public endpoints verified for CORS + large-payload operations —— */
 const RPCS = {
   ghostnet: [
-    'https://rpc.ghostnet.teztnets.com',
-    'https://ghostnet.ecadinfra.com'
+    'https://rpc.ghostnet.teztnets.com'
   ],
   mainnet: [
-    'https://mainnet.ecadinfra.com',
-    'https://mainnet.api.tez.ie'
+    'https://mainnet.ecadinfra.com'
   ]
 };
 

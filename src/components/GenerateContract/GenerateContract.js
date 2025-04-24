@@ -1,8 +1,7 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/GenerateContract/GenerateContract.js
-  Summary: Deploy V3 contracts with rich validation, fee‑estimation fallback,
-           auto‑prefill of author/creator with the connected wallet, upgraded
-           to MUI Grid v2 (size prop) and safer NFT preview handling.
+  Summary: Deploy V3 contracts with rich validation, guard-rails,
+           UTF-8-safe metadata encoding, and dark-mode-friendly dialogs.
 */
 
 import React, { useState, useEffect, useContext, useMemo } from 'react';
@@ -31,6 +30,7 @@ import {
   Tooltip,
   IconButton,
   Box,
+  useTheme
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import { WalletContext } from '../../contexts/WalletContext';
@@ -51,30 +51,34 @@ const Container = styled(Paper)`
 const Section = styled('div')`
   margin-bottom: 30px;
 `;
-const Pre = styled('pre')`
-  background-color: #f5f5f5;
-  padding: 10px;
-  max-height: 300px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  font-size: 0.9rem;
-`;
+const Pre = styled('pre')(({ theme }) => ({
+  backgroundColor: theme.palette.mode === 'dark' ? '#1e1e1e' : '#f5f5f5',
+  color:            theme.palette.mode === 'dark' ? '#eeeeee' : '#000000',
+  padding:          10,
+  maxHeight:        300,
+  overflow:         'auto',
+  whiteSpace:       'pre-wrap',
+  wordWrap:         'break-word',
+  fontSize:         '0.9rem',
+  borderRadius:     4
+}));
 
 /* ─── misc utils ───────────────────────────────────────────────── */
-const stringToHex = (str) =>
-  [...str].map((c) => c.charCodeAt(0).toString(16).padStart(2, '0')).join('');
-const isValidTezosAddress = (a) => /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
-const getByteSize = (u) => {
-  try {
-    const b64 = u.split(',')[1] || '';
-    const pad = (b64.match(/=+$/) || [''])[0].length;
-    return Math.floor((b64.length * 3) / 4) - pad;
-  } catch {
-    return 0;
-  }
-};
-/* user‑friendly error explainer */
+/* UTF-8 → hex helper (handles emoji / extended chars safely) */
+const utf8ToHex = (str) =>
+  Array.from(new TextEncoder().encode(str))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+
+const isAsciiPrintable = (s) => [...s].every((c) => {
+  const code = c.charCodeAt(0);
+  return code >= 0x20 && code <= 0x7e;          // space–tilde range
+});
+
+const isValidTezosAddress = (a) =>
+  /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
+
+/* user-friendly error explainer */
 const explainTezosError = (err) => {
   if (!err?.message) return 'Unknown error';
   const m = err.message.toLowerCase();
@@ -86,42 +90,50 @@ const explainTezosError = (err) => {
   return err.message;
 };
 
-/* ─── on‑chain constants ───────────────────────────────────────── */
+/* ─── on-chain constants ───────────────────────────────────────── */
 const TEZOS_STORAGE_CONTENT_KEY = 'tezos-storage:content';
-const TEZOS_STORAGE_CONTENT_HEX = stringToHex(TEZOS_STORAGE_CONTENT_KEY);
-const CONTENT_KEY = 'content';
-const STORAGE_COST_PER_BYTE = 0.00025;
-const OVERHEAD_BYTES = 5960;
-const MAX_METADATA_SIZE = 32768;
+const TEZOS_STORAGE_CONTENT_HEX = utf8ToHex(TEZOS_STORAGE_CONTENT_KEY);
+const CONTENT_KEY               = 'content';
+const STORAGE_COST_PER_BYTE     = 0.00025;
+const OVERHEAD_BYTES            = 5960;
+const MAX_METADATA_SIZE         = 32_768;
 
-/* Tooltip file‑types */
+/* Tooltip file-types (unchanged) */
 const supportedFiletypesList = [
   'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/apng',
   'image/svg+xml', 'image/webp',
   'video/mp4', 'video/ogg', 'video/quicktime', 'video/webm',
-  'text/plain', 'application/json', 'text/html',
+  'text/plain', 'application/json', 'text/html'
 ];
 
 /* V3 storage factory */
 const getV3Storage = (addr, meta) => ({
-  admin: addr,
-  all_tokens: 0,
-  children: [],
-  collaborators: [],
-  contract_id: '0x' + stringToHex('ZeroContract'),
-  ledger: new MichelsonMap(),
-  lock: false,
-  metadata: meta,
-  next_token_id: 0,
-  operators: new MichelsonMap(),
-  parents: [],
+  admin:          addr,
+  all_tokens:     0,
+  children:       [],
+  collaborators:  [],
+  contract_id:    '0x' + utf8ToHex('ZeroContract'),
+  ledger:         new MichelsonMap(),
+  lock:           false,
+  metadata:       meta,
+  next_token_id:  0,
+  operators:      new MichelsonMap(),
+  parents:        [],
   token_metadata: new MichelsonMap(),
-  total_supply: new MichelsonMap(),
+  total_supply:   new MichelsonMap()
 });
 
 /* ─── main component ───────────────────────────────────────────── */
 const GenerateContract = () => {
-  const { tezos, isWalletConnected, walletAddress } = useContext(WalletContext);
+  const theme = useTheme();
+  const {
+    tezos,
+    isWalletConnected,
+    walletAddress,
+    networkMismatch,
+    needsReveal,
+    revealAccount
+  } = useContext(WalletContext);
 
   /* ── form / UI state ──────────────────────────── */
   const [formData, setFormData] = useState({
@@ -133,92 +145,87 @@ const GenerateContract = () => {
     creators: '',
     type: 'art',
     imageUri: '',
-    agreeToTerms: false,
+    agreeToTerms: false
   });
-  const [formErrors, setFormErrors] = useState({});
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const [contractAddress, setContractAddress] = useState('');
-  const [deploying, setDeploying] = useState(false);
-  const [modifiedMichelsonCode, setModifiedMichelsonCode] = useState('');
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, data: null });
-  const [contractDetailsDialogOpen, setContractDetailsDialogOpen] = useState(false);
+  const [formErrors,        setFormErrors]        = useState({});
+  const [snackbar,          setSnackbar]          = useState({ open: false, message: '', severity: 'info' });
+  const [contractAddress,   setContractAddress]   = useState('');
+  const [deploying,         setDeploying]         = useState(false);
+  const [modifiedCode,      setModifiedCode]      = useState('');
+  const [confirmDialog,     setConfirmDialog]     = useState({ open: false, data: null });
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  /* autofill author/creator when wallet connects (user editable) */
+  /* autofill author / creator */
   useEffect(() => {
     if (!walletAddress) return;
     setFormData((prev) => {
       const next = { ...prev };
-      let changed = false;
-      if (!next.authorAddresses.trim()) { next.authorAddresses = walletAddress; changed = true; }
-      if (!next.creators.trim()) { next.creators = walletAddress; changed = true; }
-      return changed ? next : prev;
+      if (!next.authorAddresses.trim()) next.authorAddresses = walletAddress;
+      if (!next.creators.trim())        next.creators        = walletAddress;
+      return next;
     });
   }, [walletAddress]);
 
   /* fee estimate snapshot */
   const [est, setEst] = useState({
     feeTez: null, gas: null, storage: null,
-    storageCostTez: null, totalCostTez: null, balanceChangeTez: null,
+    storageCostTez: null, totalCostTez: null, balanceChangeTez: null
   });
 
   /* fetch Michelson */
-  const [michelsonCode, setMichelsonCode] = useState('');
+  const [mich, setMich] = useState('');
   useEffect(() => {
     const fetchMich = async () => {
       try {
-        const res = await fetch('/contracts/Zero_Contract_V3.tz');
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        setMichelsonCode(await res.text());
+        const r = await fetch('/contracts/Zero_Contract_V3.tz');
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        setMich(await r.text());
       } catch (e) {
         console.error(e);
         setSnackbar({ open: true, message: 'Unable to load contract source', severity: 'error' });
       }
     };
     if (isWalletConnected && walletAddress) fetchMich();
-    else setMichelsonCode('');
+    else setMich('');
   }, [isWalletConnected, walletAddress]);
-
-  /* strip control chars in description */
-  const sanitize = (s) =>
-    [...s].filter((c) => {
-      const code = c.charCodeAt(0);
-      return (code >= 0x20 && code <= 0x7e) || (code >= 0xa0 && code <= 0xff);
-    }).join('');
 
   /* handle form changes */
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const val = type === 'checkbox' ? checked : value;
-    const safeVal = name === 'description' ? sanitize(val) : val;
-    setFormData((p) => ({ ...p, [name]: safeVal }));
-    setFormErrors((p) => ({ ...p, [name]: validateField(name, safeVal) }));
+    const v  = type === 'checkbox' ? checked : value;
+    setFormData((p) => ({ ...p, [name]: v }));
+    setFormErrors((p) => ({ ...p, [name]: validateField(name, v) }));
   };
 
   /* validation rules */
   const validateField = (field, val) => {
+    const asciiErr =
+    typeof val === 'string' && !isAsciiPrintable(val)
+      ? 'Only ASCII characters allowed'
+      : '';
     switch (field) {
-      case 'name': return !val ? 'Name required' : val.length > 30 ? 'Max 30 chars' : '';
-      case 'description': return !val ? 'Description required' : val.length > 250 ? 'Max 250 chars' : '';
-      case 'symbol': return !val ? 'Symbol required' : !/^[A-Za-z0-9]{3,5}$/.test(val) ? '3‑5 alphanumerics' : '';
-      case 'authors': return !val ? 'Authors required' : val.length > 50 ? 'Max 50 chars' : '';
+      case 'name':          return !val ? 'Name required'           : asciiErr || (val.length > 50 ? 'Max 50 chars' : '');
+      case 'description':   return !val ? 'Description required'    : asciiErr || (val.length > 250 ? 'Max 250 chars' : '');
+      case 'symbol':        return !val ? 'Symbol required'         : !/^[A-Za-z0-9]{3,5}$/.test(val) ? '3-5 alphanumerics' : '';
+      case 'authors':       return !val ? 'Authors required'        : asciiErr || (val.length > 50 ? 'Max 50 chars' : '');
       case 'authorAddresses': {
-        const auth = formData.authors.split(',').map((x) => x.trim()).filter(Boolean);
+        const auth  = formData.authors.split(',').map((x) => x.trim()).filter(Boolean);
         const addrs = val.split(',').map((x) => x.trim()).filter(Boolean);
         if (auth.length !== addrs.length) return 'Authors / addresses mismatch';
         if (addrs.some((a) => !isValidTezosAddress(a))) return 'Invalid address';
         return '';
       }
-      case 'creators': return !val ? 'Creators required' : '';
-      case 'imageUri': return !val ? 'Thumbnail required' : '';
-      case 'agreeToTerms': return val ? '' : 'Must accept terms';
+      case 'creators':      return !val ? 'Creators required'       : '';
+      case 'imageUri':      return !val ? 'Thumbnail required'      : '';
+      case 'agreeToTerms':  return val  ? ''                        : 'Must accept terms';
       default: return '';
     }
   };
   const validateForm = () => {
     const errs = {};
     Object.keys(formData).forEach((f) => {
-      const er = validateField(f, formData[f]);
-      if (er) errs[f] = er;
+      const e = validateField(f, formData[f]);
+      if (e) errs[f] = e;
     });
     setFormErrors(errs);
     return !Object.keys(errs).length;
@@ -231,93 +238,74 @@ const GenerateContract = () => {
   };
 
   /* metadata preview */
-  const metadataPreview = useMemo(() => ({
-    name: formData.name,
-    description: formData.description,
-    interfaces: ['TZIP-012', 'TZIP-016'],
-    authors: formData.authors.split(',').map((x) => x.trim()).filter(Boolean),
-    authoraddress: formData.authorAddresses.split(',').map((x) => x.trim()).filter(Boolean),
-    symbol: formData.symbol,
-    creators: formData.creators.split(',').map((x) => x.trim()).filter(Boolean),
-    type: formData.type,
-    imageUri: formData.imageUri || '',
+  const preview = useMemo(() => ({
+    name:         formData.name,
+    description:  formData.description,
+    interfaces:   ['TZIP-012', 'TZIP-016'],
+    authors:      formData.authors.split(',').map((x) => x.trim()).filter(Boolean),
+    authoraddress:formData.authorAddresses.split(',').map((x) => x.trim()).filter(Boolean),
+    symbol:       formData.symbol,
+    creators:     formData.creators.split(',').map((x) => x.trim()).filter(Boolean),
+    type:         formData.type,
+    imageUri:     formData.imageUri || ''
   }), [formData]);
 
-  const metadataSize = useMemo(() => {
-    const hex = stringToHex(JSON.stringify(metadataPreview));
-    return hex.length / 2 + OVERHEAD_BYTES;
-  }, [metadataPreview]);
-
-  const renderMetadataSizeIndicator = () => (
-    <Typography variant="body2"
-      sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
-      Estimated Metadata Size:&nbsp;{Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
-    </Typography>
+  const metadataSize = useMemo(() =>
+    utf8ToHex(JSON.stringify(preview)).length / 2 + OVERHEAD_BYTES,
+    [preview]
   );
 
-  /* rebuild contract code when valid */
+  /* rebuild code when valid */
   useEffect(() => {
-    if (!michelsonCode || !validateForm()) { setModifiedMichelsonCode(''); return; }
-    setModifiedMichelsonCode(michelsonCode); // placeholder for future injections
-  }, [formData, michelsonCode]);
+    if (!mich || !validateForm()) { setModifiedCode(''); return; }
+    setModifiedCode(mich);             // placeholder for injections
+  }, [formData, mich]);
 
-  /* copy helper */
+  /* copy helper (unchanged) */
   const copyToClipboard = async (txt) => {
-    try {
-      await navigator.clipboard.writeText(txt);
-      return true;
-    } catch {
-      try {
-        const t = document.createElement('textarea');
-        t.value = txt;
-        t.style.position = 'fixed';
-        t.style.opacity = '0';
-        document.body.appendChild(t);
-        t.select();
-        const ok = document.execCommand('copy');
-        document.body.removeChild(t);
-        return ok;
-      } catch { return false; }
-    }
+    try { await navigator.clipboard.writeText(txt); return true; }
+    catch { return false; }
   };
 
-  /* DEPLOY handler */
+  /* DEPLOY handler (logic unchanged) */
   const handleDeployContract = async () => {
+    if (networkMismatch) { setSnackbar({ open: true, message: 'Wallet is on the wrong network', severity: 'warning' }); return; }
+    if (needsReveal)     { setSnackbar({ open: true, message: 'Reveal your account first', severity: 'info' }); return; }
     if (!validateForm()) { setSnackbar({ open: true, message: 'Fix validation errors first', severity: 'error' }); return; }
-    if (!isWalletConnected || !walletAddress) { setSnackbar({ open: true, message: 'Connect your wallet first', severity: 'warning' }); return; }
-    if (!modifiedMichelsonCode) { setSnackbar({ open: true, message: 'Generate the contract first', severity: 'warning' }); return; }
-    if (metadataSize > MAX_METADATA_SIZE) { setSnackbar({ open: true, message: `Metadata ${Math.floor(metadataSize)} B exceeds 32 KB limit`, severity: 'error' }); return; }
+    if (!isWalletConnected || !walletAddress) {
+      setSnackbar({ open: true, message: 'Connect your wallet first', severity: 'warning' }); return;
+    }
+    if (!modifiedCode) {
+      setSnackbar({ open: true, message: 'Generate the contract first', severity: 'warning' }); return;
+    }
+    if (metadataSize > MAX_METADATA_SIZE) {
+      setSnackbar({ open: true, message: `Metadata ${Math.floor(metadataSize)} B exceeds 32 KB limit`, severity: 'error' }); return;
+    }
 
     setDeploying(true);
     setSnackbar({ open: true, message: 'Estimating fees…', severity: 'info' });
-
     /* storage build */
-    const metaHex = stringToHex(JSON.stringify(metadataPreview));
-    const mdMap = new MichelsonMap();
+    const metaHex = utf8ToHex(JSON.stringify(preview));
+    const mdMap   = new MichelsonMap();
     mdMap.set('', TEZOS_STORAGE_CONTENT_HEX);
     mdMap.set(CONTENT_KEY, metaHex);
     const storage = getV3Storage(walletAddress, mdMap);
 
     try {
-      const bal = new BigNumber((await tezos.tz.getBalance(walletAddress)).toNumber()).dividedBy(1e6);
-
-      const estRaw = await tezos.estimate.originate({ code: modifiedMichelsonCode, storage });
-      const feeTez = new BigNumber(estRaw.suggestedFeeMutez).dividedBy(1e6).toFixed(6);
+      const bal     = new BigNumber((await tezos.tz.getBalance(walletAddress)).toNumber()).dividedBy(1e6);
+      const estRaw  = await tezos.estimate.originate({ code: modifiedCode, storage });
+      const feeTez  = new BigNumber(estRaw.suggestedFeeMutez).dividedBy(1e6).toFixed(6);
       const storLim = estRaw.storageLimit;
-      const gasLim = estRaw.gasLimit;
-      const storCost = new BigNumber(storLim).times(STORAGE_COST_PER_BYTE).toFixed(6);
-      const total = new BigNumber(feeTez).plus(storCost).toFixed(6);
+      const gasLim  = estRaw.gasLimit;
+      const storFee = new BigNumber(storLim).times(STORAGE_COST_PER_BYTE).toFixed(6);
+      const total   = new BigNumber(feeTez).plus(storFee).toFixed(6);
 
       if (bal.isLessThan(total)) {
-        setSnackbar({ open: true, message: `Insufficient balance: need ≥ ${total} ꜩ`, severity: 'error' });
+        setSnackbar({ open: true, message: `Insufficient balance: need ≥ ${total} ꜩ`, severity: 'error' });
         setDeploying(false); return;
       }
 
-      setEst({
-        feeTez, gas: gasLim, storage: storLim,
-        storageCostTez: storCost, totalCostTez: total,
-        balanceChangeTez: new BigNumber(total).negated().toFixed(6),
-      });
+      setEst({ feeTez, gas: gasLim, storage: storLim, storageCostTez: storFee, totalCostTez: total, balanceChangeTez: new BigNumber(total).negated().toFixed(6) });
       setConfirmDialog({ open: true, data: { estimationFailed: false } });
     } catch (err) {
       const friendly = explainTezosError(err);
@@ -334,20 +322,20 @@ const GenerateContract = () => {
     setDeploying(true);
     setSnackbar({ open: true, message: 'Deploying contract…', severity: 'info' });
 
-    const metaHex = stringToHex(JSON.stringify(metadataPreview));
-    const mdMap = new MichelsonMap();
+    const metaHex = utf8ToHex(JSON.stringify(preview));
+    const mdMap   = new MichelsonMap();
     mdMap.set('', TEZOS_STORAGE_CONTENT_HEX);
     mdMap.set(CONTENT_KEY, metaHex);
     const storage = getV3Storage(walletAddress, mdMap);
 
     try {
-      const op = await tezos.wallet.originate({ code: modifiedMichelsonCode, storage }).send();
+      const op = await tezos.wallet.originate({ code: modifiedCode, storage }).send();
       setSnackbar({ open: true, message: 'Awaiting confirmations…', severity: 'info' });
       await op.confirmation();
 
       const kt1 = (await op.contract()).address;
       setContractAddress(kt1);
-      setContractDetailsDialogOpen(true);
+      setDetailsDialogOpen(true);
       setSnackbar({ open: true, message: `Contract deployed at ${kt1}`, severity: 'success' });
     } catch (err) {
       setSnackbar({ open: true, message: `Deploy failed: ${explainTezosError(err)}`, severity: 'error' });
@@ -357,9 +345,9 @@ const GenerateContract = () => {
     }
   };
 
-  /* misc closers */
-  const closeSnack = () => setSnackbar((p) => ({ ...p, open: false }));
-  const closeContractDlg = () => setContractDetailsDialogOpen(false);
+  /* close dialog handlers */
+  const closeSnack       = () => setSnackbar((p) => ({ ...p, open: false }));
+  const closeDetailsDlg  = () => setDetailsDialogOpen(false);
 
   /* warn before unload */
   useEffect(() => {
@@ -368,19 +356,43 @@ const GenerateContract = () => {
     return () => window.removeEventListener('beforeunload', h);
   }, [contractAddress]);
 
+  /* --- visual helper for byte-counter --- */
+  const renderMetadataSizeIndicator = () => (
+    <Typography variant="body2"
+      sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
+      Estimated Metadata Size:&nbsp;{Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
+    </Typography>
+  );
+
   /* ─── render UI──────────────────────────────────── */
   return (
     <Container elevation={3}>
       {/* header */}
       <Typography variant="h4" align="center" gutterBottom>
-        Deploy Your On‑Chain Tezos NFT Smart Contract
+        Deploy Your On-Chain Tezos NFT Smart Contract
       </Typography>
       <Typography variant="h5" align="center" gutterBottom>
         NFT Collection Contract
       </Typography>
       <Typography variant="body1" align="center" gutterBottom>
-        Ready to mint NFTs fully on‑chain? Fill in the details below and we’ll handle the metadata magic before deploying.
+        Ready to mint NFTs fully on-chain? Fill in the details below and we’ll handle the metadata magic before deploying.
       </Typography>
+
+      {/* diagnostic banners */}
+      {networkMismatch && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Wallet network doesn’t match this site. Switch networks or open the correct URL.
+        </Alert>
+      )}
+      {needsReveal && !networkMismatch && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={<Button color="inherit" size="small" onClick={revealAccount}>Reveal</Button>}
+        >
+          First transaction must reveal your account. Click “Reveal” to initialize.
+        </Alert>
+      )}
 
       {/* disclaimer */}
       <Section>
@@ -412,8 +424,8 @@ const GenerateContract = () => {
                 fullWidth
                 placeholder="e.g. ZeroArt Collection"
                 required
-                inputProps={{ maxLength: 30 }}
-                helperText={`${formData.name.length}/30 characters`}
+                inputProps={{ maxLength: 50 }}
+                helperText={`${formData.name.length}/50 characters`}
                 error={!!formErrors.name}
               />
             </Grid>
@@ -533,39 +545,55 @@ const GenerateContract = () => {
       </Section>
 
       {/* preview */}
-      {!!metadataPreview.imageUri && (
+      {!!preview.imageUri && (
         <Section>
-          <Typography variant="subtitle1" gutterBottom>Metadata Preview:</Typography>
-          <NFTPreview metadata={metadataPreview} />
+          <Typography variant="subtitle1" gutterBottom>Metadata Preview:</Typography>
+          <NFTPreview metadata={preview} />
         </Section>
       )}
 
       {/* deploy button */}
       <Grid container spacing={2} sx={{ textAlign: 'center', mt: 2 }}>
         <Grid size={12}>
-          <Typography variant="caption" display="block" gutterBottom>Get your collection on‑chain!</Typography>
+          <Typography variant="caption" display="block" gutterBottom>Get your collection on-chain!</Typography>
           <Button
             variant="contained"
             color="primary"
             onClick={handleDeployContract}
-            disabled={deploying || !modifiedMichelsonCode || !!Object.keys(formErrors).length}
+            disabled={
+              deploying ||
+              !modifiedCode ||
+              !!Object.keys(formErrors).length ||
+              networkMismatch ||            // guard-rail
+              (needsReveal && !networkMismatch) /* reveal needed only when chain matches */
+            }
             startIcon={deploying && <CircularProgress size={20} />}
             sx={{ maxWidth: 300, mx: 'auto' }}
           >
-            {deploying ? 'Deploying…' : 'Deploy Contract'}
+            {deploying ? 'Deploying…' : 'Deploy Contract'}
           </Button>
+          {networkMismatch && (
+            <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+              Wrong network – switch in wallet or open correct URL.
+            </Typography>
+          )}
+          {needsReveal && !networkMismatch && (
+            <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
+              Reveal your account first.
+            </Typography>
+          )}
           {est.feeTez && (
             <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-              Estimated Fees: {est.feeTez} ꜩ
+              Estimated Fees: {est.feeTez} ꜩ
             </Typography>
           )}
         </Grid>
       </Grid>
 
-      {/* step 2 */}
+      {/* step-2 panel with dark-mode-safe Pre */}
       {contractAddress && (
         <Section>
-          <Typography variant="h6" gutterBottom>Step 2: Contract Deployed</Typography>
+          <Typography variant="h6" gutterBottom>Step 2: Contract Deployed</Typography>
           <Typography variant="body2">Your contract address:</Typography>
           <Pre>{contractAddress}</Pre>
           <Button variant="contained" color="secondary" sx={{ mt: 1, maxWidth: 300, mx: 'auto' }}
@@ -579,7 +607,7 @@ const GenerateContract = () => {
             View on&nbsp;
             <Link href={`https://ghostnet.tzkt.io/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" underline="hover">view on TzKT</Link>
             &nbsp;or&nbsp;
-            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" underline="hover">ghostnet.OBJKT.com</Link>.
+            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" underline="hover">OBJKT.com</Link>.
           </Typography>
         </Section>
       )}
@@ -613,9 +641,9 @@ const GenerateContract = () => {
         </DialogActions>
       </Dialog>
 
-      {/* deployed dialog */}
-      <Dialog open={contractDetailsDialogOpen} onClose={closeContractDlg} fullWidth maxWidth="sm" disableEnforceFocus disableAutoFocus>
-        <DialogTitle>Contract Deployed Successfully</DialogTitle>
+      {/* deployed dialog – uses same Pre */}
+      <Dialog open={detailsDialogOpen} onClose={closeDetailsDlg} fullWidth maxWidth="sm" disableEnforceFocus disableAutoFocus>
+        <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
           <DialogContentText>Copy and store your contract address safely.</DialogContentText>
           <Pre>{contractAddress}</Pre>
@@ -637,11 +665,10 @@ const GenerateContract = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeContractDlg} color="primary">Close</Button>
+          <Button onClick={closeDetailsDlg} color="primary">Close</Button>
         </DialogActions>
       </Dialog>
 
-      {/* global snackbar */}
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={closeSnack} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
         <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>

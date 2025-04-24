@@ -1,14 +1,28 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/Header.js
-  Summary: Toolbar with theme toggle, network selector (domain redirect)
-           and responsive drawer. Menu array fixed for SSR.
+  Summary: Toolbar + theme toggle + network selector + guard-rail banners.
+           “Reveal” banner now hides when wallet is on the wrong network.
 */
 
 import React, { useContext, useState } from 'react';
 import {
-  AppBar, Toolbar, Typography, Button, IconButton, Drawer,
-  ListItemButton, ListItemText, Box, useMediaQuery, MenuItem,
-  Select, FormControl, InputLabel, Divider
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  IconButton,
+  Drawer,
+  ListItemButton,
+  ListItemText,
+  Box,
+  useMediaQuery,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  Divider,
+  Alert,
+  Stack
 } from '@mui/material';
 import { styled, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -19,7 +33,7 @@ import Link from 'next/link';
 import { WalletContext } from '../contexts/WalletContext';
 import ColorModeContext from '../contexts/ColorModeContext';
 
-const Logo = styled('img')({ width: 40, height: 40, marginRight: 8 });
+const Logo            = styled('img')({ width: 40, height: 40, marginRight: 8 });
 const HeaderContainer = styled(AppBar)`background-color: darkgreen;`;
 
 /* —— Primary nav links (declared outside the component for SSR) —— */
@@ -31,7 +45,7 @@ const MENU_ITEMS = [
   { text: 'Terms',              link: '/terms' }
 ];
 
-/* —— Domain redirect helper — replace URLs per-deployment —— */
+/* —— Domain redirect helper —— */
 const redirectFor = (target) =>
   target === 'ghostnet'
     ? 'https://ghostnet.savetheworldwithart.io'
@@ -40,8 +54,18 @@ const redirectFor = (target) =>
 export default function Header () {
   const theme     = useTheme();
   const isMobile  = useMediaQuery(theme.breakpoints.down('sm'));
-  const { walletAddress, isWalletConnected,
-          connectWallet, disconnectWallet, network } = useContext(WalletContext);
+
+  const {
+    walletAddress,
+    isWalletConnected,
+    connectWallet,
+    disconnectWallet,
+    network,
+    networkMismatch,
+    needsReveal,
+    revealAccount
+  } = useContext(WalletContext);
+
   const { mode, toggleColorMode } = useContext(ColorModeContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -51,7 +75,7 @@ export default function Header () {
   const walletLabel  = () =>
     !isWalletConnected
       ? 'Connect Wallet'
-      : `Disconnect (${walletAddress.slice(0,6)}…${walletAddress.slice(-4)})`;
+      : `Disconnect (${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)})`;
   const walletAction = isWalletConnected ? disconnectWallet : connectWallet;
 
   return (
@@ -131,12 +155,39 @@ export default function Header () {
             >
               {isMobile
                 ? isWalletConnected
-                  ? `${walletAddress.slice(0,4)}…${walletAddress.slice(-4)}`
+                  ? `${walletAddress.slice(0, 4)}…${walletAddress.slice(-4)}`
                   : 'Connect'
                 : walletLabel()}
             </Button>
           </Box>
         </Toolbar>
+
+        {/* —— Runtime diagnostics —— */}
+        {(networkMismatch || (needsReveal && !networkMismatch)) && (
+          <Stack spacing={1} sx={{ px: 2, pb: 2 }}>
+            {networkMismatch && (
+              <Alert severity="warning">
+                Wallet is on <strong>{network === 'mainnet' ? 'Ghostnet' : 'Mainnet'}</strong>; this
+                site is <strong>{network}</strong>. Switch network in Temple/Kukai, or visit the
+                correct URL.
+              </Alert>
+            )}
+
+            {needsReveal && !networkMismatch && (
+              <Alert
+                severity="info"
+                action={
+                  <Button color="inherit" size="small" onClick={revealAccount}>
+                    Reveal
+                  </Button>
+                }
+              >
+                First transaction must reveal your account. Click “Reveal” to send a 0 ꜩ
+                initialization.
+              </Alert>
+            )}
+          </Stack>
+        )}
       </HeaderContainer>
 
       {/* —— Mobile drawer —— */}

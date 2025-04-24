@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@airgap/beacon-sdk": "^4.5.0",
+    "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
     "@emotion/styled": "^11.14.0",
@@ -18,7 +19,9 @@
     "@taquito/beacon-wallet": "^21.0.4",
     "@taquito/taquito": "^21.0.4",
     "bignumber.js": "^9.2.0",
+    "jszip": "^3.10.1",
     "next": "14.2.x",
+    "prop-types": "^15.8.1",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "styled-components": "^5.3.3"
@@ -27,5 +30,6 @@
     "@testing-library/dom": "^10.4.0",
     "@types/react": "^19.1.0",
     "react-is": "^19.1.0"
-  }
+  },
+  "packageManager": "yarn@4.9.1"
 }

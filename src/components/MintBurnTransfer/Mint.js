@@ -1,8 +1,8 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/MintBurnTransfer/Mint.js
-  Summary: Fully‑on‑chain NFT mint form with fee‑estimation fallback,
-           wallet autofill, exhaustive licence list, and post‑mint
-           auto‑refill for rapid successive minting.
+  Summary: Fully-on-chain NFT mint form with fee-estimation fallback,
+           guard-rails for wrong-network / unrevealed accounts, wallet
+           autofill, exhaustive licence list, and post-mint auto-refill.
 */
 
 import React, { useState, useEffect, useRef, useContext } from 'react';
@@ -29,6 +29,7 @@ import {
   Tooltip,
   Chip,
   Box,
+  Alert
 } from '@mui/material';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
@@ -53,21 +54,21 @@ const OVERHEAD_BYTES = 360;
 const MAX_METADATA_SIZE = 32_768;
 
 const ON_CHAIN_LICENSE =
-  'On‑Chain NFT License 2.0 (KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z)';
+  'On-Chain NFT License 2.0 (KT1S9GHLCrGg5YwoJGDDuC347bCTikefZQ4z)';
 
 const LICENCE_OPTIONS = [
-  'CC0 (Public Domain)',
-  'All Rights Reserved',
+  'CC0 (Public Domain)',
+  'All Rights Reserved',
   ON_CHAIN_LICENSE,
-  'CC BY 4.0',
-  'CC BY‑SA 4.0',
-  'CC BY‑ND 4.0',
-  'CC BY‑NC 4.0',
-  'CC BY‑NC‑SA 4.0',
-  'CC BY‑NC‑ND 4.0',
+  'CC BY 4.0',
+  'CC BY-SA 4.0',
+  'CC BY-ND 4.0',
+  'CC BY-NC 4.0',
+  'CC BY-NC-SA 4.0',
+  'CC BY-NC-ND 4.0',
   'MIT',
   'GPL',
-  'Apache 2.0',
+  'Apache 2.0',
   'Unlicense',
   'Custom',
 ];
@@ -110,7 +111,7 @@ const explainTezosError = (err) => {
   if (m.includes('not enough tez') || m.includes('balance')) return 'Wallet balance too low';
   if (m.includes('forbidden') || m.includes('cors')) return 'RPC node rejected the request';
   if (m.includes('bad gateway') || m.includes('502')) return 'RPC node temporarily unavailable';
-  if (m.includes('expired')) return 'Wallet session expired – reconnect';
+  if (m.includes('expired')) return 'Wallet session expired – reconnect';
   return err.message;
 };
 
@@ -119,8 +120,13 @@ const numberInputProps = { onWheel: preventWheel, inputProps: { inputMode: 'nume
 
 /* ─── main component ─────────────────────────────── */
 const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
-  const { walletAddress } = useContext(WalletContext);
-
+  const {
+    walletAddress,
+    networkMismatch,
+    needsReveal,
+    revealAccount
+  } = useContext(WalletContext);
+  
   /* ── form & UI state ─────────────────────────── */
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [attributes, setAttributes] = useState([{ name: '', value: '' }]);
@@ -131,7 +137,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const [tagInput, setTagInput] = useState('');
   const tagInputRef = useRef(null);
 
-  /* live‑computed */
+  /* live-computed */
   const [metadataSize, setMetadataSize] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -329,6 +335,8 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
 
   /* ── mint button ──────────────────────────────── */
   const handleMintClick = async () => {
+    if (networkMismatch) { snack('Wallet is on the wrong network'); return; }
+    if (needsReveal) { snack('Reveal your account first'); return; }
     if (!validateForm()) return;
     setLoading(true);
     const res = await estimateFees();
@@ -376,11 +384,22 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   return (
     <div style={{ marginTop: 20 }}>
       <Typography variant="h6">
-        Mint NFT Fully On‑Chain ({contractVersion === 'v1' ? 'Single Edition' : 'Multiple Editions'})
+        Mint NFT Fully On-Chain ({contractVersion === 'v1' ? 'Single Edition' : 'Multiple Editions'})
       </Typography>
       <Typography variant="body2" gutterBottom>
-        Enter NFT metadata below. Fields marked with * are required.
+        Enter NFT metadata below. Fields marked with * are required.
       </Typography>
+
+      {networkMismatch && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Wallet network doesn’t match this site. Switch networks or open the correct URL.
+        </Alert>
+      )}
+      {needsReveal && !networkMismatch && (
+        <Alert severity="info" sx={{ mb: 2 }} action={<Button color="inherit" size="small" onClick={revealAccount}>Reveal</Button>}>
+          First transaction must reveal your account. Click “Reveal” to initialize.
+        </Alert>
+      )}
 
       <Grid container spacing={2}>
         {/* Name */}
@@ -669,12 +688,30 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           variant="contained"
           color="success"
           onClick={handleMintClick}
-          disabled={loading || !agreed || metadataSize > MAX_METADATA_SIZE}
+          disabled={
+            loading ||
+            !agreed ||
+            metadataSize > MAX_METADATA_SIZE ||
+            networkMismatch ||                    // guard-rails
+            (needsReveal && !networkMismatch)
+          }
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
           {loading ? 'Preparing…' : 'Mint NFT'}
         </Button>
       </Box>
+
+      {/* helper text below button */}
+      {networkMismatch && (
+        <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+          Wrong network – switch in wallet or open correct URL.
+        </Typography>
+      )}
+      {needsReveal && !networkMismatch && (
+        <Typography variant="body2" color="info.main" sx={{ mt: 1 }}>
+          Your account is unrevealed. Click “Reveal” above first.
+        </Typography>
+      )}
 
       {/* live estimation summary (non‑blocking) */}
       {est.feeTez && (
