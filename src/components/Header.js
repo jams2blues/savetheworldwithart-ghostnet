@@ -40,7 +40,7 @@ const HeaderContainer = styled(AppBar)`background-color: darkgreen;`;
 const MENU_ITEMS = [
   { text: 'Home',               link: '/' },
   { text: 'Deploy Contract',    link: '/generate' },
-  { text: 'Mint/Burn/Transfer', link: '/mint-burn-transfer' },
+  { text: 'Manage Contract', link: '/mint-burn-transfer' },
   { text: 'On-Chain License',   link: '/on-chain-license' },
   { text: 'Terms',              link: '/terms' }
 ];

@@ -312,7 +312,7 @@ const MintBurnTransfer = () => {
   return (
     <StyledPaper elevation={3}>
       <Typography variant="h5" gutterBottom>
-        Mint, Burn, and Transfer NFTs
+        Manage Your Zero Contracts
       </Typography>
       <Disclaimer>
         <Typography variant="body2">
