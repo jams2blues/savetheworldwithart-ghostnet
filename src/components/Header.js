@@ -1,7 +1,8 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/Header.js
   Summary: Toolbar + theme toggle + network selector + guard-rail banners.
-           “Reveal” banner now hides when wallet is on the wrong network.
+           Adds graceful Snackbar-based error handling for Reveal, plus
+           explicit “needs funds” notice to avoid empty_transaction failures.
 */
 
 import React, { useContext, useState } from 'react';
@@ -22,7 +23,8 @@ import {
   InputLabel,
   Divider,
   Alert,
-  Stack
+  Stack,
+  Snackbar         // ⬅ new
 } from '@mui/material';
 import { styled, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -36,13 +38,13 @@ import ColorModeContext from '../contexts/ColorModeContext';
 const Logo            = styled('img')({ width: 40, height: 40, marginRight: 8 });
 const HeaderContainer = styled(AppBar)`background-color: darkgreen;`;
 
-/* —— Primary nav links (declared outside the component for SSR) —— */
+/* —— Primary nav links (declared outside component for SSR) —— */
 const MENU_ITEMS = [
-  { text: 'Home',               link: '/' },
-  { text: 'Deploy Contract',    link: '/generate' },
+  { text: 'Home',            link: '/' },
+  { text: 'Deploy Contract', link: '/generate' },
   { text: 'Manage Contract', link: '/mint-burn-transfer' },
-  { text: 'On-Chain License',   link: '/on-chain-license' },
-  { text: 'Terms',              link: '/terms' }
+  { text: 'On-Chain License',link: '/on-chain-license' },
+  { text: 'Terms',           link: '/terms' }
 ];
 
 /* —— Domain redirect helper —— */
@@ -63,11 +65,13 @@ export default function Header () {
     network,
     networkMismatch,
     needsReveal,
+    needsFunds,        // ⬅ new flag from WalletContext
     revealAccount
   } = useContext(WalletContext);
 
   const { mode, toggleColorMode } = useContext(ColorModeContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [snack, setSnack] = useState({ open: false, msg: '', severity: 'error' });
 
   const handleNetworkChange = (e) => { window.location.href = redirectFor(e.target.value); };
   const toggleDrawer        = (open) => () => setDrawerOpen(open);
@@ -77,6 +81,15 @@ export default function Header () {
       ? 'Connect Wallet'
       : `Disconnect (${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)})`;
   const walletAction = isWalletConnected ? disconnectWallet : connectWallet;
+
+  /* graceful Reveal with Snackbar feedback */
+  const handleReveal = async () => {
+    try { await revealAccount(); }
+    catch (e) {
+      console.error(e);
+      setSnack({ open: true, msg: e.message || 'Reveal failed', severity: 'error' });
+    }
+  };
 
   return (
     <>
@@ -163,27 +176,31 @@ export default function Header () {
         </Toolbar>
 
         {/* —— Runtime diagnostics —— */}
-        {(networkMismatch || (needsReveal && !networkMismatch)) && (
+        {(networkMismatch || needsFunds || (needsReveal && !networkMismatch)) && (
           <Stack spacing={1} sx={{ px: 2, pb: 2 }}>
             {networkMismatch && (
               <Alert severity="warning">
                 Wallet is on <strong>{network === 'mainnet' ? 'Ghostnet' : 'Mainnet'}</strong>; this
-                site is <strong>{network}</strong>. Switch network in Temple/Kukai, or visit the
-                correct URL.
+                site is <strong>{network}</strong>. Switch networks or open the correct URL.
               </Alert>
             )}
 
-            {needsReveal && !networkMismatch && (
+            {needsFunds && !networkMismatch && (
+              <Alert severity="info">
+                Your account is empty. Fund it with Ghostnet ꜩ from the faucet before revealing.
+              </Alert>
+            )}
+
+            {needsReveal && !networkMismatch && !needsFunds && (
               <Alert
                 severity="info"
                 action={
-                  <Button color="inherit" size="small" onClick={revealAccount}>
+                  <Button color="inherit" size="small" onClick={handleReveal}>
                     Reveal
                   </Button>
                 }
               >
-                First transaction must reveal your account. Click “Reveal” to send a 0 ꜩ
-                initialization.
+                First transaction must reveal your account.
               </Alert>
             )}
           </Stack>
@@ -193,16 +210,24 @@ export default function Header () {
       {/* —— Mobile drawer —— */}
       <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer(false)}>
         <Box sx={{ width: 250, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Box sx={{ flex: '1 1 auto' }} onClick={toggleDrawer(false)} onKeyDown={toggleDrawer(false)}>
+          <Box
+            sx={{ flex: '1 1 auto' }}
+            onClick={toggleDrawer(false)}
+            onKeyDown={toggleDrawer(false)}
+          >
             {MENU_ITEMS.map((i) => (
               <Link key={i.text} href={i.link} legacyBehavior passHref>
-                <ListItemButton><ListItemText primary={i.text} /></ListItemButton>
+                <ListItemButton>
+                  <ListItemText primary={i.text} />
+                </ListItemButton>
               </Link>
             ))}
             <Divider sx={{ my: 1 }} />
 
             <ListItemButton onClick={toggleColorMode}>
-              <ListItemText primary={mode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'} />
+              <ListItemText
+                primary={mode === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+              />
               {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
             </ListItemButton>
 
@@ -221,6 +246,22 @@ export default function Header () {
           <Box sx={{ flexShrink: 0 }} />
         </Box>
       </Drawer>
+
+      {/* —— Global Snackbar —— */}
+      <Snackbar
+        open={snack.open}
+        autoHideDuration={6000}
+        onClose={() => setSnack((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={snack.severity}
+          sx={{ width: '100%' }}
+          onClose={() => setSnack((p) => ({ ...p, open: false }))}
+        >
+          {snack.msg}
+        </Alert>
+      </Snackbar>
     </>
   );
 }
