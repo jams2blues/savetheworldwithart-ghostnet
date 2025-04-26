@@ -1,5 +1,5 @@
 /*Developed by @jams2blues with love for the Tezos community
-  File: src/components/MintBurnTransfer/MintBurnTransfer.js
+  File: src/components/ManageContract/ManageContract.js
   Summary: Unified Ghostnet/Mainnet carousels + manual loader + polished action
            layout. Dark‑mode contrast fix for disclaimer banner.
 */
@@ -193,7 +193,7 @@ const fetchMetadata = async (address, network) => {
 };
 
 /* ─── Main Component ───────────────────────────────────────────── */
-const MintBurnTransfer = () => {
+const ManageContract = () => {
   const { tezos, isWalletConnected, walletAddress, network } = useContext(WalletContext);
   const [contractAddress, setContractAddress] = useState('');
   const [contractMetadata, setContractMetadata] = useState(null);
@@ -321,7 +321,7 @@ const MintBurnTransfer = () => {
       </Disclaimer>
       
       {/* Originated Carousel */}
-      <Typography variant="h6" sx={{ mt: 3 }}>My Originated Contracts</Typography>
+      <Typography variant="h7" sx={{ mt: 3 }}>Originated Contracts my connected wallet can mint to</Typography>
       {origLoading ? (
         <LoadingGraphic>
           <Typography variant="body1" gutterBottom>
@@ -381,7 +381,7 @@ const MintBurnTransfer = () => {
       )}
 
       {/* Collaborative Carousel */}
-      <Typography variant="h6" sx={{ mt:4 }}>My Collaborative Contracts</Typography>
+      <Typography variant="h7" sx={{ mt:4 }}>Collab contracts my connected wallet can mint to</Typography>
       {collabLoading ? (
         <LoadingGraphic>
           <Typography variant="body1" gutterBottom>
@@ -514,7 +514,7 @@ const MintBurnTransfer = () => {
                   MINT
                 </Button>
                 <Typography variant="body2" align="center">
-                  Mint a single edition.
+                  1/1 or Multiple editions v2+ only.
                 </Typography>
 
                 <Button
@@ -527,7 +527,7 @@ const MintBurnTransfer = () => {
                   BURN
                 </Button>
                 <Typography variant="body2" align="center">
-                  Burn a single edition.
+                  Burn NFTs
                 </Typography>
 
                 <Button
@@ -772,4 +772,4 @@ const MintBurnTransfer = () => {
   );
 };
 
-export default MintBurnTransfer;
+export default ManageContract;

@@ -1,5 +1,5 @@
 /* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/ManageCollaborators.js
+   File: src/components/ManageContract/ManageCollaborators.js
    Summary: Provides a popup that fetches current collaborator addresses from the contract storage
    and lets the user remove them individually via a single click.
 */

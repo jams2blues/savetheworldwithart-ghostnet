@@ -1,5 +1,5 @@
 /*Developed by @jams2blues with love for the Tezos community
-  File: src/components/MintBurnTransfer/ManageParentChild.js
+  File: src/components/ManageContract/ManageParentChild.js
   Summary: List and remove parent/child relationships from contract storage
 */
 import React, { useState, useEffect } from 'react';

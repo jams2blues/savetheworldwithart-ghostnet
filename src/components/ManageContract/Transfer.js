@@ -1,5 +1,5 @@
 /* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/Transfer.js
+   File: src/components/ManageContract/Transfer.js
    Summary: Component for transferring NFTs between addresses.
 */
 import React, { useState } from 'react';

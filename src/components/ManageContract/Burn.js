@@ -1,5 +1,5 @@
 /* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/Burn.js
+   File: src/components/ManageContract/Burn.js
    Summary: Component for burning NFTs.
 */
 import React, { useState } from 'react';

@@ -50,7 +50,7 @@ const Terms = () => (
         Terms and Conditions
       </Typography>
       <Typography variant="body1" gutterBottom>
-        <strong>Last Updated:</strong> April 05 2025
+        <strong>Last Updated:</strong> April 26 2025
       </Typography>
 
       {/* Core sections */}
@@ -94,7 +94,7 @@ const Terms = () => (
       <ul style={{ marginTop: 0 }}>
         {[
           'mint – create new NFTs',
-          'burn – permanently remove NFTs',
+          'burn – sends NFTs to the burn address: tz1burnburnburnburnburnburnburjAYjjX',
           'transfer – send NFTs between addresses',
           'balance_of – query balances',
           'update_operators – manage operator permissions',

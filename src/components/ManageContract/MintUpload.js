@@ -1,4 +1,4 @@
-// src/components/MintBurnTransfer/MintUpload.js
+// src/components/ManageContract/MintUpload.js
 // Summary: MintUpload – A component that allows users to upload their NFT file for minting.
 // It supports multiple file types, warns if the file size (raw or encoded) exceeds the recommended 20KB,
 // and provides user feedback via snackbars. The file is accepted even if larger than 20KB.

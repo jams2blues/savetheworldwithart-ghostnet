@@ -1,5 +1,5 @@
 /*Developed by @jams2blues with love for the Tezos community
-  File: src/components/MintBurnTransfer/AddRemoveParentChild.js
+  File: src/components/ManageContract/AddRemoveParentChild.js
   Summary: Batch add or remove parent/child Tezos addresses via entrypoint calls
 */
 import React, { useState } from 'react';

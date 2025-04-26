@@ -33,9 +33,9 @@ const Home = () => {
           </Link>
         </Grid>
         <Grid>
-          <Link href="/mint-burn-transfer" passHref legacyBehavior>
+          <Link href="/manage-contract" passHref legacyBehavior>
             <Button variant="outlined" color="secondary" sx={{ px: 3, py: 2 }}>
-              Mint/Burn/Transfer
+              Manage Contract
             </Button>
           </Link>
         </Grid>

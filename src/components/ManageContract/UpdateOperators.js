@@ -1,5 +1,5 @@
 /* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/UpdateOperators.js
+   File: src/components/ManageContract/UpdateOperators.js
    Summary: Allows updating NFT operator permissions for different contract versions.
 */
 import React, { useState } from 'react';

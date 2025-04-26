@@ -1,5 +1,5 @@
 /* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/AddRemoveCollaborator.js
+   File: src/components/ManageContract/AddRemoveCollaborator.js
    Summary: Add or remove one – or many – collaborator addresses in a single
             Tezos signature.  Accepts addresses separated by commas, spaces, or
             newlines and batches the calls using Taquito’s wallet batch builder.

@@ -1,5 +1,5 @@
 /*Developed by @jams2blues with love for the Tezos community
-  File: src/components/MintBurnTransfer/Mint.js
+  File: src/components/ManageContract/Mint.js
   Summary: Fully-on-chain NFT mint form with fee-estimation fallback,
            guard-rails for wrong-network / unrevealed accounts, wallet
            autofill, exhaustive licence list, and post-mint auto-refill.

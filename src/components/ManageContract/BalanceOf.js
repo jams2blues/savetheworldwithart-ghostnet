@@ -1,5 +1,5 @@
 /* Developed by @jams2blues with love for the Tezos community
-   File: src/components/MintBurnTransfer/BalanceOf.js
+   File: src/components/ManageContract/BalanceOf.js
    Summary: Component to check NFT balance for a given owner address and token ID.
 */
 import React, { useState } from 'react';
