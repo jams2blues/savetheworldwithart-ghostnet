@@ -398,7 +398,7 @@ const GenerateContract = () => {
       <Section>
         <Alert severity="warning">
           <Typography variant="body2">
-            <strong>Disclaimer:</strong> Deployments are <em>immutable</em>. Always test on Ghostnet before mainnet.
+            <strong>Disclaimer:</strong> Deployments are <em>immutable</em>. Always test on Ghostnet before mainnet. Standard keyboard characters recommended, emojis and symbols might fail.
           </Typography>
         </Alert>
       </Section>

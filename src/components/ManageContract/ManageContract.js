@@ -316,7 +316,7 @@ const ManageContract = () => {
       </Typography>
       <Disclaimer>
         <Typography variant="body2">
-          <strong>Disclaimer:</strong> Use at your own risk. You are on {network}.
+          <strong>Disclaimer:</strong> Use at your own risk. You are on {network}. Standard keyboard characters recommended, emojis and symbols might fail.
         </Typography>
       </Disclaimer>
       
