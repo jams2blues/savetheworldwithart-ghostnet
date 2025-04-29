@@ -604,7 +604,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
         {/* Authors Names */}
         <Grid size={12}>
           <TextField
-            label="Author Name(s) *"
+            label="Author Name(s)"
             name="authors"
             value={formData.authors}
             onChange={handleInputChange}
