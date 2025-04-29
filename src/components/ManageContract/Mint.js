@@ -334,7 +334,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
 
   /* ── validation ───────────────────────────────── */
   const validateForm = () => {
-    const required = ['name', 'creators', 'authors', 'toAddress', 'license'];
+    const required = ['name', 'creators', 'toAddress', 'license'];
     for (const f of required) {
       if (!formData[f].trim()) {
         snack(`${f} is required`);
