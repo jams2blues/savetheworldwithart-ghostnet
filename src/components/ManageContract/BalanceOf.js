@@ -2,6 +2,7 @@
    File: src/components/ManageContract/BalanceOf.js
    Summary: Component to check NFT balance for a given owner address and token ID.
 */
+
 import React, { useState } from 'react';
 import { Typography, TextField, Button, CircularProgress, Grid } from '@mui/material';
 
@@ -26,26 +27,39 @@ const BalanceOf = ({ contractAddress, tezos, setSnackbar, contractVersion }) => 
       setSnackbar({ open: true, message: 'Token ID must be a non-negative integer.', severity: 'warning' });
       return;
     }
+
     try {
       setLoading(true);
       const contract = await tezos.contract.at(contractAddress);
       const storage = await contract.storage();
       let fetchedBalance = 0;
-      if (contractVersion === 'v1') {
+
+      const ver = contractVersion.toString().toLowerCase();
+      if (ver === 'v1') {
+        // V1: ledger key is tokenId => owner address
         const owner = await storage.ledger.get(tokenIdNum);
         fetchedBalance = owner && owner.toLowerCase() === ownerAddress.toLowerCase() ? 1 : 0;
-      } else if (contractVersion === 'v2' || contractVersion === 'v3') {
+      } else if (ver.startsWith('v2') || ver === 'v3') {
+        // V2/V2a/V2b/... and V3: ledger key is [owner, tokenId] => amount
         const key = [ownerAddress.trim(), tokenIdNum];
         const amount = await storage.ledger.get(key);
         fetchedBalance = amount ? parseInt(amount, 10) : 0;
       } else {
-        throw new Error('Unsupported contract version.');
+        throw new Error(`Unsupported contract version: ${contractVersion}`);
       }
+
       setBalance(fetchedBalance);
       setSnackbar({ open: true, message: `Balance fetched: ${fetchedBalance}`, severity: 'success' });
+
     } catch (error) {
-      setSnackbar({ open: true, message: `Failed to fetch balance: ${error.message}`, severity: 'error' });
+      const msg = error?.message || '';
+      let userMessage = `Failed to fetch balance: ${msg}`;
+      if (msg.includes('contract.not_found') || msg.includes('Invalid account address')) {
+        userMessage = 'Contract not found on this network. Please switch to the correct network.';
+      }
+      setSnackbar({ open: true, message: userMessage, severity: 'error' });
       setBalance(null);
+
     } finally {
       setLoading(false);
     }
