@@ -1,136 +1,105 @@
-// src/components/ManageContract/MintUpload.js
-// Summary: MintUpload – A component that allows users to upload their NFT file for minting.
-// It supports multiple file types, warns if the file size (raw or encoded) exceeds the recommended 20KB,
-// and provides user feedback via snackbars. The file is accepted even if larger than 20KB.
-/* this app was developed by @jams2blues with love for the Tezos community */
+/*Developed by @jams2blues with love for the Tezos community
+  File: src/components/ManageContract/MintUpload.js
+  Summary: NFT artifact uploader — handles file selection and data-URL conversion only, no preview logic
+*/
+
 import React, { useState, useRef } from 'react';
 import { Button, Snackbar, Alert, Typography, Tooltip } from '@mui/material';
 
-const ACCEPTED_TYPES = [
-  'image/bmp',
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/apng',
-  'image/svg+xml',
-  'image/webp',
-  'video/mp4',
-  'video/ogg',
-  'video/quicktime',
-  'video/webm',
-  'audio/mpeg',
-  'audio/ogg',
-  'audio/wav',
-  'audio/wave',
-  'audio/x-pn-wav',
-  'audio/vnd.wave',
-  'audio/x-wav',
-  'audio/flac',
-  'model/gltf-binary',
-  'model/gltf+json',
-  'application/pdf',
-  'text/plain',
-  'application/json',
-  'application/zip',
-  'application/x-zip-compressed',
-  'multipart/x-zip'
+/*──────────────────────── Accepted types & extensions ───────────────*/
+const MIME_TYPES = [
+  'image/bmp','image/gif','image/jpeg','image/png','image/apng','image/svg+xml','image/webp',
+  'video/mp4','video/ogg','video/quicktime','video/webm',
+  'model/gltf-binary','model/gltf+json','model/gltf','application/octet-stream',
+  'audio/mpeg','audio/ogg','audio/wav','audio/wave','audio/x-pn-wav','audio/vnd.wave','audio/x-wav','audio/flac',
+  'application/pdf','text/plain','application/json','text/html',
+  'application/zip','application/x-zip-compressed','multipart/x-zip',
 ];
+const EXTENSIONS = ['.glb', '.gltf', '.html'];
+const ACCEPT_ATTR = [...MIME_TYPES, ...EXTENSIONS].join(',');
 
-// Recommended maximum size for the raw file (20KB) for optimal performance (not blocking if exceeded)
-const RAW_RECOMMENDED_SIZE = 20 * 1024;
+/*──────────────────────── Limits & helpers ──────────────────────────*/
+const RAW_WARN = 20 * 1024;
+const extOf = (f) => (f?.name.match(/\.[^.]+$/) || [''])[0].toLowerCase();
+const okFile = (f) =>
+  MIME_TYPES.includes(f.type) || EXTENSIONS.includes(extOf(f)) || f.type === '';
+const bytesOfB64 = (uri) => {
+  const b = uri.split(',')[1] || '';
+  const pad = (b.match(/=+$/) || [''])[0].length;
+  return Math.floor((b.length * 3) / 4) - pad;
+};
 
+/*──────────────────────── Component ────────────────────────────────*/
 const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [snack, setSnack] = useState({ open: false, msg: '', sev: 'info' });
   const [fileName, setFileName] = useState('');
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
 
-  // Utility: Calculate the byte size of a base64 data URI
-  const getByteSize = (dataUri) => {
-    try {
-      const base64Data = dataUri.split(',')[1] || '';
-      const padding = (base64Data.match(/=+$/) || [''])[0].length;
-      return Math.floor((base64Data.length * 3) / 4) - padding;
-    } catch (error) {
-      console.error('Error calculating byte size:', error);
-      return 0;
-    }
-  };
+  const close = () => setSnack(p => ({ ...p, open: false }));
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    // Reset previous state
-    setFileName('');
-    onFileChange(null);
-    onFileDataUrlChange(null);
-
-    // Check that the file MIME type is accepted
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setSnackbar({ open: true, message: 'Unsupported file type.', severity: 'error' });
+  const handleChange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    if (!okFile(f)) {
+      setSnack({ open: true, msg: 'Unsupported file type.', sev: 'error' });
       e.target.value = null;
       return;
     }
-
-    // Warn if the raw file size exceeds the recommended limit (20KB)
-    if (file.size > RAW_RECOMMENDED_SIZE) {
-      setSnackbar({ open: true, message: 'Warning: File size exceeds 20KB recommended limit.', severity: 'warning' });
+    if (f.size > RAW_WARN) {
+      setSnack({ open: true, msg: 'Raw size > 20 KB – consider compression.', sev: 'warning' });
     }
-
     setUploading(true);
-    try {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUri = reader.result;
-        const byteSize = getByteSize(dataUri);
-        // Warn if the encoded file size exceeds the recommended limit
-        if (byteSize > RAW_RECOMMENDED_SIZE) {
-          setSnackbar({ open: true, message: 'Warning: Encoded file size exceeds recommended limit.', severity: 'warning' });
-        }
-        onFileDataUrlChange(dataUri);
-        onFileChange(file);
-        setFileName(file.name);
-        setSnackbar({ open: true, message: 'File uploaded successfully.', severity: 'success' });
-      };
-      reader.onerror = () => {
-        setSnackbar({ open: true, message: 'Error reading file.', severity: 'error' });
-        e.target.value = null;
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      setSnackbar({ open: true, message: 'Unexpected error occurred.', severity: 'error' });
-      e.target.value = null;
-    } finally {
+    const reader = new FileReader();
+    reader.onload = () => {
+      let uri = reader.result;
+      if (['model/gltf-binary','model/gltf','application/octet-stream'].includes(f.type) || ['.glb','.gltf'].includes(extOf(f))) {
+        uri = uri.replace(
+          /^data:[^;]+/,
+          f.name.toLowerCase().endsWith('.gltf')
+            ? 'data:model/gltf+json'
+            : 'data:model/gltf-binary'
+        );
+      }
+      if (bytesOfB64(uri) > RAW_WARN) {
+        setSnack({ open: true, msg: 'Encoded size > 20 KB – wallets may truncate.', sev: 'warning' });
+      } else {
+        setSnack({ open: true, msg: 'File uploaded.', sev: 'success' });
+      }
+      setFileName(f.name);
       setUploading(false);
-    }
+      onFileChange(f);
+      onFileDataUrlChange(uri);
+    };
+    reader.onerror = () => {
+      setSnack({ open: true, msg: 'Read error – try again.', sev: 'error' });
+      setUploading(false);
+    };
+    reader.readAsDataURL(f);
   };
 
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
-  };
-
-  // Tooltip with supported file types and recommended size
-  const tooltipTitle = (
-    <div>
-      <Typography variant="subtitle2">Supported File Types:</Typography>
-      <Typography variant="body2">Images, Videos, Audio, 3D Models, Text, Archives</Typography>
-      <Typography variant="subtitle2">Recommended Max Size:</Typography>
-      <Typography variant="body2">20KB</Typography>
-    </div>
-  );
-
+  /*────── UI ─────────────────────────────────────────────────────────*/
   return (
     <div>
       <input
-        ref={fileInputRef}
-        accept={ACCEPTED_TYPES.join(',')}
-        style={{ display: 'none' }}
+        ref={inputRef}
         id="mint-nft-upload"
         type="file"
-        onChange={handleFileChange}
+        accept={ACCEPT_ATTR}
+        style={{ display: 'none' }}
+        onChange={handleChange}
       />
       <label htmlFor="mint-nft-upload">
-        <Tooltip title={tooltipTitle} arrow>
+        <Tooltip
+          title={
+            <div>
+              <Typography variant="subtitle2">Supported File Types</Typography>
+              <Typography variant="body2">Images, Video, Audio, 3D Models, HTML, Text, Archives</Typography>
+              <Typography variant="subtitle2">Target size ≤ 20 KB</Typography>
+            </div>
+          }
+          arrow
+        >
           <span>
             <Button
               variant="contained"
@@ -138,26 +107,27 @@ const MintUpload = ({ onFileChange, onFileDataUrlChange }) => {
               color="primary"
               sx={{ mt: 1 }}
               disabled={uploading}
-              aria-label="Upload Your NFT File"
             >
-              {uploading ? 'Uploading...' : 'Upload Your NFT *'}
+              {uploading ? 'Uploading…' : 'Upload Your NFT *'}
             </Button>
           </span>
         </Tooltip>
       </label>
+
       {fileName && (
         <Typography variant="body2" sx={{ mt: 1 }}>
-          <strong>Selected file:</strong> {fileName}
+          <strong>Selected:</strong> {fileName}
         </Typography>
       )}
+
       <Snackbar
-        open={snackbar.open}
+        open={snack.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
+        onClose={close}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
+        <Alert severity={snack.sev} onClose={close} sx={{ width: '100%' }}>
+          {snack.msg}
         </Alert>
       </Snackbar>
     </div>

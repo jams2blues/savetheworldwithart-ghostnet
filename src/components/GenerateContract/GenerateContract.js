@@ -4,7 +4,12 @@
            UTF-8-safe metadata encoding, and dark-mode-friendly dialogs.
 */
 
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useMemo,
+} from 'react';
 import styled from '@emotion/styled';
 import {
   Button,
@@ -30,7 +35,7 @@ import {
   Tooltip,
   IconButton,
   Box,
-  useTheme
+  useTheme,
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
 import { WalletContext } from '../../contexts/WalletContext';
@@ -64,27 +69,22 @@ const Pre = styled('pre')(({ theme }) => ({
 }));
 
 /* ─── misc utils ───────────────────────────────────────────────── */
-/* UTF-8 → hex helper (handles emoji / extended chars safely) */
 const utf8ToHex = (str) =>
   Array.from(new TextEncoder().encode(str))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
-
 const isAsciiPrintable = (s) => [...s].every((c) => {
   const code = c.charCodeAt(0);
-  return code >= 0x20 && code <= 0x7e;          // space–tilde range
+  return code >= 0x20 && code <= 0x7e;
 });
-
 const isValidTezosAddress = (a) =>
   /^(tz1|tz2|tz3|KT1)[1-9A-HJ-NP-Za-km-z]{33}$/.test(a);
-
-/* user-friendly error explainer */
 const explainTezosError = (err) => {
   if (!err?.message) return 'Unknown error';
   const m = err.message.toLowerCase();
   if (m.includes('oversized operation')) return 'Contract metadata exceeds protocol size limits';
   if (m.includes('not enough tez') || m.includes('balance')) return 'Wallet balance too low for fees + storage';
-  if (m.includes('forbidden') || m.includes('cors')) return 'RPC node rejected the request (CORS / auth)';
+  if (m.includes('forbidden') || m.includes('cors')) return 'RPC node rejected the request (CORS/auth)';
   if (m.includes('502') || m.includes('bad gateway')) return 'RPC node temporarily unavailable';
   if (m.includes('expired') || m.includes('proposal expired')) return 'Wallet session expired – reconnect the wallet';
   return err.message;
@@ -98,15 +98,14 @@ const STORAGE_COST_PER_BYTE     = 0.00025;
 const OVERHEAD_BYTES            = 5960;
 const MAX_METADATA_SIZE         = 32_768;
 
-/* Tooltip file-types (unchanged) */
+/* ─── Tooltip file-types ───────────────────────────────────────── */
 const supportedFiletypesList = [
-  'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/apng',
-  'image/svg+xml', 'image/webp',
-  'video/mp4', 'video/ogg', 'video/quicktime', 'video/webm',
-  'text/plain', 'application/json', 'text/html'
+  'image/bmp','image/gif','image/jpeg','image/png','image/apng',
+  'image/svg+xml','image/webp','video/mp4','video/ogg','video/quicktime',
+  'video/webm','text/plain','application/json','text/html'
 ];
 
-/* V3 storage factory */
+/* ─── V3 storage factory ───────────────────────────────────────── */
 const getV3Storage = (addr, meta) => ({
   admin:          addr,
   all_tokens:     0,
@@ -132,30 +131,38 @@ const GenerateContract = () => {
     walletAddress,
     networkMismatch,
     needsReveal,
-    revealAccount
+    revealAccount,
   } = useContext(WalletContext);
 
-  /* ── form / UI state ──────────────────────────── */
+  /* form/UI state */
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    authors: '',
-    authorAddresses: '',
-    symbol: '',
-    creators: '',
-    type: 'art',
-    imageUri: '',
-    agreeToTerms: false
+    name: '', description: '', authors: '', authorAddresses: '',
+    symbol: '', creators: '', type: 'art', imageUri: '', agreeToTerms: false
   });
-  const [formErrors,        setFormErrors]        = useState({});
-  const [snackbar,          setSnackbar]          = useState({ open: false, message: '', severity: 'info' });
-  const [contractAddress,   setContractAddress]   = useState('');
-  const [deploying,         setDeploying]         = useState(false);
-  const [modifiedCode,      setModifiedCode]      = useState('');
-  const [confirmDialog,     setConfirmDialog]     = useState({ open: false, data: null });
+  const [formErrors, setFormErrors] = useState({});
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+  const [contractAddress, setContractAddress] = useState('');
+  const [deploying, setDeploying] = useState(false);
+  const [modifiedCode, setModifiedCode] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, data: null });
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
 
-  /* autofill author / creator */
+  /* inject <model-viewer> for 3D previews */
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      !window.customElements?.get('model-viewer')
+    ) {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.src = 'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
+      document.head.appendChild(s);
+    }
+  }, []);
+  
+  /* autofill authorAddresses & creators when wallet connects */
   useEffect(() => {
     if (!walletAddress) return;
     setFormData((prev) => {
@@ -166,13 +173,72 @@ const GenerateContract = () => {
     });
   }, [walletAddress]);
 
-  /* fee estimate snapshot */
-  const [est, setEst] = useState({
-    feeTez: null, gas: null, storage: null,
-    storageCostTez: null, totalCostTez: null, balanceChangeTez: null
-  });
+  /* handle form changes */
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    const v = type === 'checkbox' ? checked : value;
+    setFormData((p) => ({ ...p, [name]: v }));
+    setFormErrors((p) => ({ ...p, [name]: validateField(name, v) }));
+  };
 
-  /* fetch Michelson */
+  /* validation */
+  const validateField = (field, val) => {
+    const asciiErr =
+      typeof val === 'string' && !isAsciiPrintable(val)
+        ? 'Only ASCII characters allowed'
+        : '';
+    switch (field) {
+      case 'name':           return !val ? 'Name required'           : asciiErr || (val.length > 50 ? 'Max 50 chars' : '');
+      case 'description':    return !val ? 'Description required'    : asciiErr || (val.length > 250 ? 'Max 250 chars' : '');
+      case 'symbol':         return !val ? 'Symbol required'         : !/^[A-Za-z0-9]{3,5}$/.test(val) ? '3-5 alphanumerics' : '';
+      case 'authors':        return !val ? 'Authors required'        : asciiErr || (val.length > 50 ? 'Max 50 chars' : '');
+      case 'authorAddresses': {
+        const auth  = formData.authors.split(',').map((x) => x.trim()).filter(Boolean);
+        const addrs = val.split(',').map((x) => x.trim()).filter(Boolean);
+        if (auth.length !== addrs.length) return 'Authors / addresses mismatch';
+        if (addrs.some((a) => !isValidTezosAddress(a))) return 'Invalid address';
+        return '';
+      }
+      case 'creators':       return !val ? 'Creators required'       : '';
+      case 'imageUri':       return !val ? 'Thumbnail required'      : '';
+      case 'agreeToTerms':   return val  ? ''                        : 'Must accept terms';
+      default:               return '';
+    }
+  };
+  const validateForm = () => {
+    const errs = {};
+    Object.keys(formData).forEach((f) => {
+      const e = validateField(f, formData[f]);
+      if (e) errs[f] = e;
+    });
+    setFormErrors(errs);
+    return !Object.keys(errs).length;
+  };
+
+  /* thumbnail upload */
+  const handleThumbnailUpload = (uri) => {
+    setFormData((p) => ({ ...p, imageUri: uri }));
+    setFormErrors((p) => ({ ...p, imageUri: validateField('imageUri', uri) }));
+  };
+
+  /* metadata preview & size */
+  const preview = useMemo(() => ({
+    name:          formData.name,
+    description:   formData.description,
+    interfaces:    ['TZIP-012','TZIP-016'],
+    authors:       formData.authors.split(',').map((x) => x.trim()),
+    authoraddress: formData.authorAddresses.split(',').map((x) => x.trim()),
+    symbol:        formData.symbol,
+    creators:      formData.creators.split(',').map((x) => x.trim()),
+    type:          formData.type,
+    imageUri:      formData.imageUri || '',
+  }), [formData]);
+  const metadataSize = useMemo(
+    () => new Blob([JSON.stringify(preview)]).size + OVERHEAD_BYTES,
+    [preview]
+  );
+
+  /* fetch contract source */
   const [mich, setMich] = useState('');
   useEffect(() => {
     const fetchMich = async () => {
@@ -189,85 +255,28 @@ const GenerateContract = () => {
     else setMich('');
   }, [isWalletConnected, walletAddress]);
 
-  /* handle form changes */
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    const v  = type === 'checkbox' ? checked : value;
-    setFormData((p) => ({ ...p, [name]: v }));
-    setFormErrors((p) => ({ ...p, [name]: validateField(name, v) }));
-  };
-
-  /* validation rules */
-  const validateField = (field, val) => {
-    const asciiErr =
-    typeof val === 'string' && !isAsciiPrintable(val)
-      ? 'Only ASCII characters allowed'
-      : '';
-    switch (field) {
-      case 'name':          return !val ? 'Name required'           : asciiErr || (val.length > 50 ? 'Max 50 chars' : '');
-      case 'description':   return !val ? 'Description required'    : asciiErr || (val.length > 250 ? 'Max 250 chars' : '');
-      case 'symbol':        return !val ? 'Symbol required'         : !/^[A-Za-z0-9]{3,5}$/.test(val) ? '3-5 alphanumerics' : '';
-      case 'authors':       return !val ? 'Authors required'        : asciiErr || (val.length > 50 ? 'Max 50 chars' : '');
-      case 'authorAddresses': {
-        const auth  = formData.authors.split(',').map((x) => x.trim()).filter(Boolean);
-        const addrs = val.split(',').map((x) => x.trim()).filter(Boolean);
-        if (auth.length !== addrs.length) return 'Authors / addresses mismatch';
-        if (addrs.some((a) => !isValidTezosAddress(a))) return 'Invalid address';
-        return '';
-      }
-      case 'creators':      return !val ? 'Creators required'       : '';
-      case 'imageUri':      return !val ? 'Thumbnail required'      : '';
-      case 'agreeToTerms':  return val  ? ''                        : 'Must accept terms';
-      default: return '';
-    }
-  };
-  const validateForm = () => {
-    const errs = {};
-    Object.keys(formData).forEach((f) => {
-      const e = validateField(f, formData[f]);
-      if (e) errs[f] = e;
-    });
-    setFormErrors(errs);
-    return !Object.keys(errs).length;
-  };
-
-  /* thumbnail upload */
-  const handleThumbnailUpload = (uri) => {
-    setFormData((p) => ({ ...p, imageUri: uri || '' }));
-    setFormErrors((p) => ({ ...p, imageUri: validateField('imageUri', uri || '') }));
-  };
-
-  /* metadata preview */
-  const preview = useMemo(() => ({
-    name:         formData.name,
-    description:  formData.description,
-    interfaces:   ['TZIP-012', 'TZIP-016'],
-    authors:      formData.authors.split(',').map((x) => x.trim()).filter(Boolean),
-    authoraddress:formData.authorAddresses.split(',').map((x) => x.trim()).filter(Boolean),
-    symbol:       formData.symbol,
-    creators:     formData.creators.split(',').map((x) => x.trim()).filter(Boolean),
-    type:         formData.type,
-    imageUri:     formData.imageUri || ''
-  }), [formData]);
-
-  const metadataSize = useMemo(() =>
-    utf8ToHex(JSON.stringify(preview)).length / 2 + OVERHEAD_BYTES,
-    [preview]
-  );
-
   /* rebuild code when valid */
   useEffect(() => {
-    if (!mich || !validateForm()) { setModifiedCode(''); return; }
-    setModifiedCode(mich);             // placeholder for injections
+    if (!mich || !validateForm()) {
+      setModifiedCode('');
+      return;
+    }
+    setModifiedCode(mich);
   }, [formData, mich]);
 
-  /* copy helper (unchanged) */
+  /* fee estimate */
+  const [est, setEst] = useState({
+    feeTez: null, gas: null, storage: null,
+    storageCostTez: null, totalCostTez: null, balanceChangeTez: null
+  });
+
+  /* copy helper */
   const copyToClipboard = async (txt) => {
     try { await navigator.clipboard.writeText(txt); return true; }
     catch { return false; }
   };
 
-  /* DEPLOY handler (logic unchanged) */
+  /* DEPLOY handler */
   const handleDeployContract = async () => {
     if (networkMismatch) { setSnackbar({ open: true, message: 'Wallet is on the wrong network', severity: 'warning' }); return; }
     if (needsReveal)     { setSnackbar({ open: true, message: 'Reveal your account first', severity: 'info' }); return; }
@@ -284,7 +293,7 @@ const GenerateContract = () => {
 
     setDeploying(true);
     setSnackbar({ open: true, message: 'Estimating fees…', severity: 'info' });
-    /* storage build */
+
     const metaHex = utf8ToHex(JSON.stringify(preview));
     const mdMap   = new MichelsonMap();
     mdMap.set('', TEZOS_STORAGE_CONTENT_HEX);
@@ -332,7 +341,6 @@ const GenerateContract = () => {
       const op = await tezos.wallet.originate({ code: modifiedCode, storage }).send();
       setSnackbar({ open: true, message: 'Awaiting confirmations…', severity: 'info' });
       await op.confirmation();
-
       const kt1 = (await op.contract()).address;
       setContractAddress(kt1);
       setDetailsDialogOpen(true);
@@ -345,26 +353,28 @@ const GenerateContract = () => {
     }
   };
 
-  /* close dialog handlers */
-  const closeSnack       = () => setSnackbar((p) => ({ ...p, open: false }));
-  const closeDetailsDlg  = () => setDetailsDialogOpen(false);
-
-  /* warn before unload */
+  /* close handlers & unload warning */
+  const closeSnack      = () => setSnackbar((p) => ({ ...p, open: false }));
+  const closeDetailsDlg = () => setDetailsDialogOpen(false);
   useEffect(() => {
     const h = (e) => { if (contractAddress) { e.preventDefault(); e.returnValue = ''; } };
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
   }, [contractAddress]);
 
-  /* --- visual helper for byte-counter --- */
+  /* metadata size indicator */
   const renderMetadataSizeIndicator = () => (
-    <Typography variant="body2"
-      sx={{ color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary', mb: 1 }}>
-      Estimated Metadata Size:&nbsp;{Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
+    <Typography
+      variant="body2"
+      sx={{
+        color: metadataSize > MAX_METADATA_SIZE ? 'error.main' : 'textSecondary',
+        mb: 1
+      }}
+    >
+      Estimated Metadata Size: {Math.floor(metadataSize)} / {MAX_METADATA_SIZE} bytes
     </Typography>
   );
 
-  /* ─── render UI──────────────────────────────────── */
   return (
     <Container elevation={3}>
       {/* header */}
@@ -378,7 +388,7 @@ const GenerateContract = () => {
         Ready to mint NFTs fully on-chain? Fill in the details below and we’ll handle the metadata magic before deploying.
       </Typography>
 
-      {/* diagnostic banners */}
+      {/* banners */}
       {networkMismatch && (
         <Alert severity="warning" sx={{ mb: 2 }}>
           Wallet network doesn’t match this site. Switch networks or open the correct URL.
@@ -398,7 +408,7 @@ const GenerateContract = () => {
       <Section>
         <Alert severity="warning">
           <Typography variant="body2">
-            <strong>Disclaimer:</strong> Deployments are <em>immutable</em>. Always test on Ghostnet before mainnet. Standard keyboard characters recommended, emojis and symbols might fail.
+            <strong>Disclaimer:</strong> Deployments are <em>immutable</em>. Always test on Ghostnet before mainnet. Standard keyboard characters recommended; emojis may fail.
           </Typography>
         </Alert>
       </Section>
@@ -412,9 +422,10 @@ const GenerateContract = () => {
 
       {/* form */}
       <Section>
-        <Typography variant="h6" gutterBottom>Step 1 · Collection Details</Typography>
+        <Typography variant="h6" gutterBottom>Step 1 · Collection Details</Typography>
         <form noValidate>
           <Grid container spacing={2}>
+            {/* Collection Name */}
             <Grid size={12}>
               <TextField
                 label="NFT Collection Name *"
@@ -422,7 +433,6 @@ const GenerateContract = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="e.g. ZeroArt Collection"
                 required
                 inputProps={{ maxLength: 50 }}
                 helperText={`${formData.name.length}/50 characters`}
@@ -430,6 +440,7 @@ const GenerateContract = () => {
               />
             </Grid>
 
+            {/* Symbol */}
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="NFT Symbol *"
@@ -437,14 +448,14 @@ const GenerateContract = () => {
                 value={formData.symbol}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="e.g. ZERO"
                 required
                 inputProps={{ maxLength: 5 }}
-                helperText={`${formData.symbol.length}/5 characters · letters & numbers`}
+                helperText={`${formData.symbol.length}/5 chars (A–Z0–9)`}
                 error={!!formErrors.symbol}
               />
             </Grid>
 
+            {/* Description */}
             <Grid size={12}>
               <TextField
                 label="NFT Collection Description *"
@@ -454,7 +465,6 @@ const GenerateContract = () => {
                 fullWidth
                 multiline
                 rows={4}
-                placeholder="Describe your NFT collection"
                 required
                 inputProps={{ maxLength: 250 }}
                 helperText={`${formData.description.length}/250 characters`}
@@ -462,6 +472,7 @@ const GenerateContract = () => {
               />
             </Grid>
 
+            {/* Authors */}
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Author(s) *"
@@ -469,7 +480,6 @@ const GenerateContract = () => {
                 value={formData.authors}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="e.g. Alice, Bob"
                 required
                 inputProps={{ maxLength: 50 }}
                 helperText={`${formData.authors.length}/50 characters`}
@@ -477,6 +487,7 @@ const GenerateContract = () => {
               />
             </Grid>
 
+            {/* Author Addresses */}
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Author Address(es) *"
@@ -484,14 +495,14 @@ const GenerateContract = () => {
                 value={formData.authorAddresses}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="Comma‑separated Tezos addresses"
                 required
                 inputProps={{ maxLength: 200 }}
-                helperText={`${formData.authorAddresses.length}/200 characters · defaults to your wallet if blank`}
+                helperText={`${formData.authorAddresses.length}/200 chars`}
                 error={!!formErrors.authorAddresses}
               />
             </Grid>
 
+            {/* Creators */}
             <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 label="Creator(s) *"
@@ -499,63 +510,110 @@ const GenerateContract = () => {
                 value={formData.creators}
                 onChange={handleInputChange}
                 fullWidth
-                placeholder="Comma‑separated Tezos addresses"
                 required
                 inputProps={{ maxLength: 200 }}
-                helperText={`${formData.creators.length}/200 characters · defaults to your wallet if blank`}
+                helperText={`${formData.creators.length}/200 chars`}
                 error={!!formErrors.creators}
               />
             </Grid>
 
+            {/* Type */}
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth margin="normal" error={!!formErrors.type}>
                 <InputLabel id="type-label">Type *</InputLabel>
-                <Select labelId="type-label" name="type" value={formData.type} onChange={handleInputChange} label="Type *">
+                <Select
+                  labelId="type-label"
+                  name="type"
+                  value={formData.type}
+                  onChange={handleInputChange}
+                  label="Type *"
+                >
                   <MenuItem value="art">Art</MenuItem>
                   <MenuItem value="music">Music</MenuItem>
                   <MenuItem value="collectible">Collectible</MenuItem>
                   <MenuItem value="other">Other</MenuItem>
                 </Select>
-                {!!formErrors.type && <Typography variant="caption" color="error">{formErrors.type}</Typography>}
+                {!!formErrors.type && (
+                  <Typography variant="caption" color="error">
+                    {formErrors.type}
+                  </Typography>
+                )}
               </FormControl>
             </Grid>
 
+            {/* Thumbnail Upload & Size */}
             <Grid size={12}>
               {renderMetadataSizeIndicator()}
               <Box sx={{ display: 'flex', alignItems: 'center' }}>
                 <FileUpload setArtifactData={handleThumbnailUpload} />
-                <Tooltip title={<><Typography variant="subtitle2">Supported Filetypes:</Typography><Typography variant="body2">{supportedFiletypesList.join(', ')}</Typography></>} arrow>
-                  <IconButton sx={{ ml: 1 }} aria-label="Supported Filetypes"><InfoIcon fontSize="small" /></IconButton>
+                <Tooltip
+                  title={
+                    <>
+                      <Typography variant="subtitle2">Supported Filetypes:</Typography>
+                      <Typography variant="body2">
+                        {supportedFiletypesList.join(', ')}
+                      </Typography>
+                    </>
+                  }
+                  arrow
+                >
+                  <IconButton sx={{ ml: 1 }} aria-label="Supported Filetypes">
+                    <InfoIcon fontSize="small" />
+                  </IconButton>
                 </Tooltip>
               </Box>
-              <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                • Thumbnail must be square · keep metadata under 32 KB
+              <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
+                • Thumbnail must be square · keep metadata under 32 KB
               </Typography>
             </Grid>
 
+            {/* Terms */}
             <Grid size={12}>
               <FormControlLabel
-                control={<Checkbox checked={formData.agreeToTerms} onChange={handleInputChange} name="agreeToTerms" color="primary" />}
-                label={<span>I agree to the <Link href="/terms" target="_blank" rel="noopener noreferrer">Terms and Conditions</Link>.</span>}
+                control={
+                  <Checkbox
+                    checked={formData.agreeToTerms}
+                    onChange={handleInputChange}
+                    name="agreeToTerms"
+                    color="primary"
+                  />
+                }
+                label={
+                  <span>
+                    I agree to the{' '}
+                    <Link href="/terms" target="_blank" rel="noopener noreferrer">
+                      Terms and Conditions
+                    </Link>
+                    .
+                  </span>
+                }
               />
-              {!!formErrors.agreeToTerms && <Typography variant="caption" color="error">{formErrors.agreeToTerms}</Typography>}
+              {!!formErrors.agreeToTerms && (
+                <Typography variant="caption" color="error">
+                  {formErrors.agreeToTerms}
+                </Typography>
+              )}
             </Grid>
           </Grid>
         </form>
       </Section>
 
-      {/* preview */}
+      {/* Metadata Preview */}
       {!!preview.imageUri && (
         <Section>
-          <Typography variant="subtitle1" gutterBottom>Metadata Preview:</Typography>
+          <Typography variant="subtitle1" gutterBottom>
+            Metadata Preview:
+          </Typography>
           <NFTPreview metadata={preview} />
         </Section>
       )}
 
-      {/* deploy button */}
+      {/* Deploy Button */}
       <Grid container spacing={2} sx={{ textAlign: 'center', mt: 2 }}>
         <Grid size={12}>
-          <Typography variant="caption" display="block" gutterBottom>Get your collection on-chain!</Typography>
+          <Typography variant="caption" display="block" gutterBottom>
+            Get your collection on-chain!
+          </Typography>
           <Button
             variant="contained"
             color="primary"
@@ -564,8 +622,8 @@ const GenerateContract = () => {
               deploying ||
               !modifiedCode ||
               !!Object.keys(formErrors).length ||
-              networkMismatch ||            // guard-rail
-              (needsReveal && !networkMismatch) /* reveal needed only when chain matches */
+              networkMismatch ||
+              (needsReveal && !networkMismatch)
             }
             startIcon={deploying && <CircularProgress size={20} />}
             sx={{ maxWidth: 300, mx: 'auto' }}
@@ -590,77 +648,140 @@ const GenerateContract = () => {
         </Grid>
       </Grid>
 
-      {/* step-2 panel with dark-mode-safe Pre */}
+      {/* Step 2: Deployed */}
       {contractAddress && (
         <Section>
-          <Typography variant="h6" gutterBottom>Step 2: Contract Deployed</Typography>
+          <Typography variant="h6" gutterBottom>
+            Step 2: Contract Deployed
+          </Typography>
           <Typography variant="body2">Your contract address:</Typography>
           <Pre>{contractAddress}</Pre>
-          <Button variant="contained" color="secondary" sx={{ mt: 1, maxWidth: 300, mx: 'auto' }}
+          <Button
+            variant="contained"
+            color="secondary"
+            sx={{ mt: 1, maxWidth: 300, mx: 'auto' }}
             onClick={async () => {
               const ok = await copyToClipboard(contractAddress);
-              setSnackbar({ open: true, message: ok ? 'Contract address copied!' : 'Copy failed', severity: ok ? 'success' : 'error' });
-            }}>
-            Copy Contract Address
+              setSnackbar({
+                open: true,
+                message: ok ? 'Contract address copied!' : 'Copy failed',
+                severity: ok ? 'success' : 'error',
+              });
+            }}
+          >
+            Copy Contract Address
           </Button>
           <Typography variant="body2" sx={{ mt: 1 }}>
             View on&nbsp;
-            <Link href={`https://ghostnet.tzkt.io/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" underline="hover">view on TzKT</Link>
+            <Link
+              href={`https://ghostnet.tzkt.io/${contractAddress}/operations`}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+            >
+              TzKT
+            </Link>
             &nbsp;or&nbsp;
-            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" underline="hover">OBJKT.com</Link>.
+            <Link
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+            >
+              OBJKT.com
+            </Link>.
           </Typography>
         </Section>
       )}
 
-      {/* confirm dialog */}
-      <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog({ open: false, data: null })} fullWidth maxWidth="sm">
-        <DialogTitle id="confirm-deployment-title">Confirm Deployment</DialogTitle>
+      {/* Confirm Dialog */}
+      <Dialog
+        open={confirmDialog.open}
+        onClose={() => setConfirmDialog({ open: false, data: null })}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Confirm Deployment</DialogTitle>
         <DialogContent>
           {confirmDialog.data?.estimationFailed ? (
             <DialogContentText>
-              Fee estimation failed (<em>{confirmDialog.data.reason}</em>).<br />Sign in your wallet to see the exact fees.
+              Fee estimation failed (<em>{confirmDialog.data.reason}</em>).
+              <br />
+              Sign in your wallet to see the exact fees.
             </DialogContentText>
           ) : (
             <DialogContentText>
-              Are you sure you want to deploy? This action is irreversible.<br /><br />
-              <strong>Estimated Fee:</strong> {est.feeTez ?? '…'} ꜩ<br />
+              Are you sure you want to deploy? This action is irreversible.
+              <br /><br />
+              <strong>Estimated Fee:</strong> {est.feeTez ?? '…'} ꜩ<br />
               <strong>Gas Limit:</strong> {est.gas ?? '…'}<br />
               <strong>Storage Limit:</strong> {est.storage ?? '…'}<br />
-              <strong>Storage Cost:</strong> {est.storageCostTez ?? '…'} ꜩ<br />
-              <strong>Total Cost:</strong> {est.totalCostTez ?? '…'} ꜩ<br />
-              <strong>Balance Change:</strong> {est.balanceChangeTez ?? '…'} ꜩ
+              <strong>Storage Cost:</strong> {est.storageCostTez ?? '…'} ꜩ<br />
+              <strong>Total Cost:</strong> {est.totalCostTez ?? '…'} ꜩ<br />
+              <strong>Balance Change:</strong> {est.balanceChangeTez ?? '…'} ꜩ
             </DialogContentText>
           )}
-          <Typography variant="subtitle2" color="error" sx={{ mt: 1 }}>**Please verify all information before proceeding.**</Typography>
+          <Typography variant="subtitle2" color="error" sx={{ mt: 1 }}>
+            **Please verify all information before proceeding.**
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDialog({ open: false, data: null })} color="secondary">Cancel</Button>
+          <Button onClick={() => setConfirmDialog({ open: false, data: null })} color="secondary">
+            Cancel
+          </Button>
           <Button onClick={confirmDeployment} color="primary" variant="contained" autoFocus>
-            {confirmDialog.data?.estimationFailed ? 'Deploy Anyway' : 'Confirm Deployment'}
+            {confirmDialog.data?.estimationFailed ? 'Deploy Anyway' : 'Confirm Deployment'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* deployed dialog – uses same Pre */}
-      <Dialog open={detailsDialogOpen} onClose={closeDetailsDlg} fullWidth maxWidth="sm" disableEnforceFocus disableAutoFocus>
+      {/* Deployed Dialog */}
+      <Dialog
+        open={detailsDialogOpen}
+        onClose={closeDetailsDlg}
+        fullWidth
+        maxWidth="sm"
+        disableEnforceFocus
+        disableAutoFocus
+      >
         <DialogTitle>Contract Deployed Successfully</DialogTitle>
         <DialogContent>
           <DialogContentText>Copy and store your contract address safely.</DialogContentText>
           <Pre>{contractAddress}</Pre>
           <Box sx={{ textAlign: 'center', my: 2 }}>
-            <Button variant="outlined" onClick={async () => {
-              const ok = await copyToClipboard(contractAddress);
-              setSnackbar({ open: true, message: ok ? 'Copied!' : 'Copy failed', severity: ok ? 'success' : 'error' });
-            }} sx={{ maxWidth: 300, mx: 'auto' }}>
-              Copy Contract Address
+            <Button
+              variant="outlined"
+              onClick={async () => {
+                const ok = await copyToClipboard(contractAddress);
+                setSnackbar({
+                  open: true,
+                  message: ok ? 'Copied!' : 'Copy failed',
+                  severity: ok ? 'success' : 'error',
+                });
+              }}
+              sx={{ maxWidth: 300, mx: 'auto' }}
+            >
+              Copy Contract Address
             </Button>
           </Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-around', mt: 2 }}>
-            <Link href={`https://ghostnet.objkt.com/collections/${contractAddress}`} target="_blank" rel="noopener noreferrer" underline="hover" color="primary">
-              View on OBJKT
+            <Link
+              href={`https://ghostnet.objkt.com/collections/${contractAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              color="primary"
+            >
+              View on OBJKT
             </Link>
-            <Link href={`https://ghostnet.tzkt.io/${contractAddress}/operations`} target="_blank" rel="noopener noreferrer" underline="hover" color="primary">
-              View on TzKT
+            <Link
+              href={`https://ghostnet.tzkt.io/${contractAddress}/operations`}
+              target="_blank"
+              rel="noopener noreferrer"
+              underline="hover"
+              color="primary"
+            >
+              View on TzKT
             </Link>
           </Box>
         </DialogContent>
@@ -669,8 +790,15 @@ const GenerateContract = () => {
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={closeSnack} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}>
-        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={closeSnack}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
       </Snackbar>
     </Container>
   );

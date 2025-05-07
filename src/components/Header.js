@@ -24,7 +24,7 @@ import {
   Divider,
   Alert,
   Stack,
-  Snackbar         // ⬅ new
+  Snackbar
 } from '@mui/material';
 import { styled, useTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -44,7 +44,8 @@ const MENU_ITEMS = [
   { text: 'Deploy Contract', link: '/generate' },
   { text: 'Manage Contract', link: '/manage-contract' },
   { text: 'On-Chain License',link: '/on-chain-license' },
-  { text: 'Terms',           link: '/terms' }
+  { text: 'Terms',           link: '/terms' },
+  { text: 'On-Chain Viewer',       link: '/on-chain-viewer' }
 ];
 
 /* —— Domain redirect helper —— */
@@ -65,7 +66,7 @@ export default function Header () {
     network,
     networkMismatch,
     needsReveal,
-    needsFunds,        // ⬅ new flag from WalletContext
+    needsFunds,
     revealAccount
   } = useContext(WalletContext);
 

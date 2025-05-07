@@ -1,7 +1,7 @@
-/*Developed by @jams2blues with love for the Tezos community
+/*Developed by @jams2blues with love for the Tezos community
   File: src/components/ManageContract/ManageContract.js
   Summary: Unified Ghostnet/Mainnet carousels + manual loader + polished action
-           layout. Dark‑mode contrast fix for disclaimer banner.
+           layout. Dark-mode contrast fix for disclaimer banner.
 */
 import React, { useState, useContext, useRef, useEffect, useCallback } from 'react';
 import styled from '@emotion/styled';
@@ -65,6 +65,47 @@ const LoadingGraphic = styled(Box)`
   text-align: center;
   padding: 40px 0;
 `;
+
+/* ─── Thumb helper (GLB/GLTF aware) ───────────────────────────── */
+const isModelUri = (u = '') =>
+  u.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(u);
+const Thumb = ({ uri, alt, sx = {} }) => {
+  if (!uri) return <Box sx={{ height: 120, bgcolor: '#eee', ...sx }} />;
+  if (isModelUri(uri)) {
+    // carousel-model
+    return (
+      <Box sx={{ height: 120, ...sx }}>
+        {/* @ts-ignore */}
+        <model-viewer
+          src={uri}
+          alt={alt}
+          camera-controls
+          style={{
+            width: '100%',
+            height: '100%',
+            background: '#f5f5f5',
+            borderRadius: 4,
+          }}
+        />
+      </Box>
+    );
+  }
+  return (
+    <Box
+      component="img"
+      src={uri}
+      alt={alt}
+      sx={{
+        height: 120,
+        width: '100%',
+        objectFit: 'contain',
+        bgcolor: '#f5f5f5',
+        borderRadius: 4,
+        ...sx,
+      }}
+    />
+  );
+};
 
 /* ─── Network maps & helpers ───────────────────────────────────── */
 const TZKT_BASE = {
@@ -195,6 +236,21 @@ const fetchMetadata = async (address, network) => {
 /* ─── Main Component ───────────────────────────────────────────── */
 const ManageContract = () => {
   const { tezos, isWalletConnected, walletAddress, network } = useContext(WalletContext);
+  /* inject <model-viewer> once for 3-D previews */
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      !window.customElements?.get('model-viewer')
+    ) {
+      const s = document.createElement('script');
+      s.type = 'module';
+      s.async = true;
+      s.crossOrigin = 'anonymous';
+      s.src =
+        'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
+      document.head.appendChild(s);
+    }
+  }, []);
   const [contractAddress, setContractAddress] = useState('');
   const [contractMetadata, setContractMetadata] = useState(null);
   const [contractVersion, setContractVersion] = useState('');
@@ -309,147 +365,188 @@ const ManageContract = () => {
   };
   const handleAction = (a) => setAction(a);
 
+  /* ─── render UI ────────────────────────────────────────────── */
   return (
     <StyledPaper elevation={3}>
+      {/* heading + disclaimer */}
       <Typography variant="h5" gutterBottom>
         Manage Your Zero Contracts
       </Typography>
       <Disclaimer>
         <Typography variant="body2">
-          <strong>Disclaimer:</strong> Use at your own risk. You are on {network}. Standard keyboard characters recommended, emojis and symbols might fail.
+          <strong>Disclaimer:</strong> Use at your own risk. You are on {network}.
+          Standard keyboard characters only.
         </Typography>
       </Disclaimer>
       
-      {/* Originated Carousel */}
-      <Typography variant="h7" sx={{ mt: 3 }}>Originated Contracts my connected wallet can mint to</Typography>
-      {origLoading ? (
-        <LoadingGraphic>
-          <Typography variant="body1" gutterBottom>
-            Loading your originated contracts, please wait...
+  {/* Originated Carousel */}
+  <Typography variant="h7" sx={{ mt: 3 }}>
+    Originated contracts my connected wallet can mint to
+  </Typography>
+  {origLoading ? (
+    <LoadingGraphic>
+      <Typography variant="body1" gutterBottom>
+        Loading your originated contracts, please wait...
+      </Typography>
+      <Stack direction="row" spacing={2} justifyContent="center">
+        <Skeleton variant="rectangular" width={180} height={200} />
+        <Skeleton variant="rectangular" width={180} height={200} />
+        <Skeleton variant="rectangular" width={180} height={200} />
+      </Stack>
+    </LoadingGraphic>
+  ) : origContracts.length === 0 ? (
+    <Typography variant="body2" color="textSecondary">
+      No originated contracts found.
+    </Typography>
+  ) : (
+    <Box sx={{ display: 'flex', alignItems: 'center', maxWidth: 700, mx: 'auto' }}>
+      <IconButton onClick={() => setOrigIdx(p => p ? p - 1 : origContracts.length - 1)}>
+        <ChevronLeftIcon />
+      </IconButton>
+      <Card sx={{ flexGrow: 1, mx: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
+        {(() => {
+          const uri = origContracts[origIdx].imageUri;
+          const isModel = uri?.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(uri);
+          return isModel ? (
+            <model-viewer
+              src={uri}
+              alt={origContracts[origIdx].name}
+              camera-controls
+              auto-rotate
+              style={{
+                width: '100%',
+                height: 200,
+                backgroundColor: '#f5f5f5',
+                borderRadius: 8,
+              }}
+            />
+          ) : uri ? (
+            <CardMedia
+              component="img"
+              image={uri}
+              alt={origContracts[origIdx].name}
+              sx={{ height: 120, objectFit: 'contain' }}
+            />
+          ) : (
+            <Box sx={{ height: 120, bgcolor: '#eee' }} />
+          );
+        })()}
+        <CardContent sx={{ flexGrow: 1 }}>
+          <Typography variant="subtitle1" gutterBottom noWrap>
+            {origContracts[origIdx].name}
           </Typography>
-          <Stack direction="row" spacing={2} justifyContent="center">
-            <Skeleton variant="rectangular" width={180} height={200} />
-            <Skeleton variant="rectangular" width={180} height={200} />
-            <Skeleton variant="rectangular" width={180} height={200} />
-          </Stack>
-        </LoadingGraphic>
-      ) : origContracts.length === 0 ? (
-        <Typography variant="body2" color="textSecondary">
-          No originated contracts found.
-        </Typography>
-      ) : (
-        <Box sx={{ display:'flex',alignItems:'center',maxWidth:700,mx:'auto' }}>
-          <IconButton onClick={()=>setOrigIdx(p=>p? p-1: origContracts.length-1)}>
-            <ChevronLeftIcon/>
-          </IconButton>
-          <Card sx={{ flexGrow:1,mx:1,minHeight:240,display:'flex',flexDirection:'column'}}>
-            {origContracts[origIdx].imageUri?(
-              <CardMedia
-                component="img"
-                image={origContracts[origIdx].imageUri}
-                alt={origContracts[origIdx].name}
-                sx={{ height:120,objectFit:'contain' }}
-              />
-            ):(
-              <Box sx={{ height:120,bgcolor:'#eee' }}/>
-            )}
-            <CardContent sx={{ flexGrow:1 }}>
-              <Typography variant="subtitle1" gutterBottom noWrap>
-                {origContracts[origIdx].name}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ display:'block',wordBreak:'break-all' }}>
-                {origContracts[origIdx].address}
-              </Typography>
-              {Number.isFinite(origContracts[origIdx].total) && (
-                <Typography variant="caption" color="textSecondary" sx={{ display:'block',mt:0.5 }}>
-                  {origContracts[origIdx].total} tokens
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-          <IconButton onClick={()=>setOrigIdx(p=>(p+1)%origContracts.length)}>
-            <ChevronRightIcon/>
-          </IconButton>
-        </Box>
-      )}
-      {!!origContracts.length && (
-        <Box sx={{ textAlign:'center',mt:1 }}>
-          <Button variant="contained" color="primary" onClick={chooseOrigin}>
-            Select Originated
-          </Button>
-        </Box>
-      )}
-
-      {/* Collaborative Carousel */}
-      <Typography variant="h7" sx={{ mt:4 }}>Collab contracts my connected wallet can mint to</Typography>
-      {collabLoading ? (
-        <LoadingGraphic>
-          <Typography variant="body1" gutterBottom>
-            Loading your collaborative contracts, please wait...
+          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', wordBreak: 'break-all' }}>
+            {origContracts[origIdx].address}
           </Typography>
-          <Stack direction="row" spacing={2} justifyContent="center">
-            <Skeleton variant="rectangular" width={180} height={200}/>
-            <Skeleton variant="rectangular" width={180} height={200}/>
-            <Skeleton variant="rectangular" width={180} height={200}/>
-          </Stack>
-        </LoadingGraphic>
-      ) : collabContracts.length===0?(
-        <Typography variant="body2" color="textSecondary">
-          No collaborative contracts found.
-        </Typography>
-      ) : (
-        <Box sx={{ display:'flex',alignItems:'center',maxWidth:700,mx:'auto' }}>
-          <IconButton onClick={()=>setCollabIdx(p=>p? p-1: collabContracts.length-1)}>
-            <ChevronLeftIcon/>
-          </IconButton>
-          <Card sx={{ flexGrow:1,mx:1,minHeight:240,display:'flex',flexDirection:'column'}}>
-            {collabContracts[collabIdx].imageUri?(
-              <CardMedia
-                component="img"
-                image={collabContracts[collabIdx].imageUri}
-                alt={collabContracts[collabIdx].name}
-                sx={{ height:120,objectFit:'contain' }}
-              />
-            ):(
-              <Box sx={{ height:120,bgcolor:'#eee' }}/>
-            )}
-            <CardContent sx={{ flexGrow:1 }}>
-              <Typography variant="subtitle1" gutterBottom noWrap>
-                {collabContracts[collabIdx].name}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ display:'block',wordBreak:'break-all' }}>
-                {collabContracts[collabIdx].address}
-              </Typography>
-              {Number.isFinite(collabContracts[collabIdx].total) && (
-                <Typography variant="caption" color="textSecondary" sx={{ display:'block',mt:0.5 }}>
-                  {collabContracts[collabIdx].total} tokens
-                </Typography>
-              )}
-            </CardContent>
-          </Card>
-          <IconButton onClick={()=>setCollabIdx(p=>(p+1)%collabContracts.length)}>
-            <ChevronRightIcon/>
-          </IconButton>
-        </Box>
-      )}
-      {!!collabContracts.length && (
-        <Box sx={{ textAlign:'center',mt:1 }}>
-          <Button variant="outlined" color="info" onClick={chooseCollab}>
-            Select Collaborative
-          </Button>
-        </Box>
-      )}
+          {Number.isFinite(origContracts[origIdx].total) && (
+            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+              {origContracts[origIdx].total} tokens
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+      <IconButton onClick={() => setOrigIdx(p => (p + 1) % origContracts.length)}>
+        <ChevronRightIcon />
+      </IconButton>
+    </Box>
+  )}
+  {!!origContracts.length && (
+    <Box sx={{ textAlign: 'center', mt: 1 }}>
+      <Button variant="contained" color="primary" onClick={chooseOrigin}>
+        Select Originated
+      </Button>
+    </Box>
+  )}
 
-      {/* Manual Load Form */}
-      <Grid container spacing={2} sx={{ mt:4 }}>
+  {/* Collaborative Carousel */}
+  <Typography variant="h7" sx={{ mt: 4 }}>
+    Collab contracts my connected wallet can mint to
+  </Typography>
+  {collabLoading ? (
+    <LoadingGraphic>
+      <Typography variant="body1" gutterBottom>
+        Loading your collaborative contracts, please wait...
+      </Typography>
+      <Stack direction="row" spacing={2} justifyContent="center">
+        <Skeleton variant="rectangular" width={180} height={200} />
+        <Skeleton variant="rectangular" width={180} height={200} />
+        <Skeleton variant="rectangular" width={180} height={200} />
+      </Stack>
+    </LoadingGraphic>
+  ) : collabContracts.length === 0 ? (
+    <Typography variant="body2" color="textSecondary">
+      No collaborative contracts found.
+    </Typography>
+  ) : (
+    <Box sx={{ display: 'flex', alignItems: 'center', maxWidth: 700, mx: 'auto' }}>
+      <IconButton onClick={() => setCollabIdx(p => p ? p - 1 : collabContracts.length - 1)}>
+        <ChevronLeftIcon />
+      </IconButton>
+      <Card sx={{ flexGrow: 1, mx: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
+        {(() => {
+          const uri = collabContracts[collabIdx].imageUri;
+          const isModel = uri?.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(uri);
+          return isModel ? (
+            <model-viewer
+              src={uri}
+              alt={collabContracts[collabIdx].name}
+              camera-controls
+              auto-rotate
+              style={{
+                width: '100%',
+                height: 200,
+                backgroundColor: '#f5f5f5',
+                borderRadius: 8,
+              }}
+            />
+          ) : uri ? (
+            <CardMedia
+              component="img"
+              image={uri}
+              alt={collabContracts[collabIdx].name}
+              sx={{ height: 120, objectFit: 'contain' }}
+            />
+          ) : (
+            <Box sx={{ height: 120, bgcolor: '#eee' }} />
+          );
+        })()}
+        <CardContent sx={{ flexGrow: 1 }}>
+          <Typography variant="subtitle1" gutterBottom noWrap>
+            {collabContracts[collabIdx].name}
+          </Typography>
+          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', wordBreak: 'break-all' }}>
+            {collabContracts[collabIdx].address}
+          </Typography>
+          {Number.isFinite(collabContracts[collabIdx].total) && (
+            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+              {collabContracts[collabIdx].total} tokens
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
+      <IconButton onClick={() => setCollabIdx(p => (p + 1) % collabContracts.length)}>
+        <ChevronRightIcon />
+      </IconButton>
+    </Box>
+  )}
+  {!!collabContracts.length && (
+    <Box sx={{ textAlign: 'center', mt: 1 }}>
+      <Button variant="outlined" color="info" onClick={chooseCollab}>
+        Select Collaborative
+      </Button>
+    </Box>
+  )}
+
+  {/* manual load form */}
+  <Grid container spacing={2} sx={{ mt: 4, width: '100%' }}>
         <Grid size={12}>
           <TextField
             label="Contract Address *"
             fullWidth
             value={contractAddress}
-            onChange={e=>setContractAddress(e.target.value)}
-            placeholder="KT1..."
-            sx={{ mb:2 }}
+            onChange={(e) => setContractAddress(e.target.value)}
+            placeholder="KT1…"
+            sx={{ mb: 2 }}
           />
         </Grid>
         <Grid size={12}>
@@ -457,31 +554,50 @@ const ManageContract = () => {
             variant="contained"
             onClick={loadManual}
             disabled={loading}
-            startIcon={loading? <CircularProgress size={20}/> :null}
+            startIcon={loading ? <CircularProgress size={20} /> : null}
             fullWidth
           >
-            {loading?'Loading…':'Load Contract'}
+            {loading ? 'Loading…' : 'Load Contract'}
           </Button>
         </Grid>
       </Grid>
 
-      {/* Metadata & Actions */}
+      {/* selected contract metadata + actions */}
       {contractMetadata && (
-        <>
-          <Grid container spacing={2} sx={{ mt: 4 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Typography variant="h6">
-                {contractMetadata.name}
-                {contractVersion && (
-                  <Typography component="span" variant="caption">
-                    ({contractVersion.toUpperCase()})
-                  </Typography>
-                )}
-              </Typography>
-              {contractMetadata.imageUri && (
+      <>
+        <Grid container spacing={2} sx={{ mt: 4 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Typography variant="h6">
+              {contractMetadata.name}
+              {contractVersion && (
+                <Typography component="span" variant="caption">
+                  ({contractVersion.toUpperCase()})
+                </Typography>
+              )}
+            </Typography>
+
+            {/* 3D Model Preview support */}
+            {contractMetadata.imageUri && (() => {
+              const uri = contractMetadata.imageUri;
+              const isModel = uri.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(uri);
+              return isModel ? (
+                <model-viewer
+                  src={uri}
+                  alt="3D Model Preview"
+                  camera-controls
+                  auto-rotate
+                  style={{
+                    width: '100%',
+                    height: 200,
+                    marginTop: 8,
+                    backgroundColor: '#f5f5f5',
+                    borderRadius: 8
+                  }}
+                />
+              ) : (
                 <Box
                   component="img"
-                  src={contractMetadata.imageUri}
+                  src={uri}
                   alt="Thumbnail"
                   sx={{
                     width: '100%',
@@ -492,14 +608,16 @@ const ManageContract = () => {
                     borderRadius: 2,
                   }}
                 />
-              )}
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Typography variant="body2">
-                {contractMetadata.description}
-              </Typography>
-            </Grid>
+              );
+            })()}
+
           </Grid>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <Typography variant="body2">
+              {contractMetadata.description}
+            </Typography>
+          </Grid>
+        </Grid>
 
           <Grid container spacing={2} sx={{ mt: 3 }}>
             <Grid size={12}>
@@ -758,6 +876,7 @@ const ManageContract = () => {
         </>
       )}
 
+      {/* Snackbars */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

@@ -1,10 +1,15 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/ManageContract/Mint.js
-  Summary: Fully-on-chain NFT mint form – FA2/TZIP-12 compliant across V1-V3.
+  Summary: Consolidate all NFT previews under NFTPreview.js and remove duplicate simple preview
 */
 
-import React, { useState, useEffect, useRef, useContext } from 'react';
-import styled from 'styled-components';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useContext,
+} from 'react';
+import styled from '@emotion/styled';
 import {
   Typography,
   TextField,
@@ -36,6 +41,7 @@ import { MichelsonMap } from '@taquito/taquito';
 import { BigNumber } from 'bignumber.js';
 import { Buffer } from 'buffer';
 import MintUpload from './MintUpload';
+import MintPreview from './MintPreview';
 import { WalletContext } from '../../contexts/WalletContext';
 
 /* ─── constants ───────────────────────────────────── */
@@ -124,7 +130,7 @@ const numberInputProps = {
   inputProps: { inputMode: 'numeric', pattern: '[0-9]*' },
 };
 
-/* ─── main component ─────────────────────────────── */
+/* main component */
 const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
   const { walletAddress, networkMismatch, needsReveal, revealAccount } =
     useContext(WalletContext);
@@ -492,7 +498,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
       setLoading(false);
     }
   };
-
+  
   /* ─── UI ───────────────────────────────────────── */
   return (
     <div style={{ marginTop: 20 }}>
@@ -555,7 +561,7 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
           />
         </Grid>
 
-        {/* Artifact */}
+        {/* Artifact File upload */}
         <Grid size={12}>
           <Typography variant="body1">Artifact File (≤20 KB recommended)</Typography>
           <MintUpload
@@ -563,28 +569,15 @@ const Mint = ({ contractAddress, tezos, contractVersion, setSnackbar }) => {
             onFileDataUrlChange={setArtifactDataUrl}
           />
           {artifactFile && (
-            <Typography variant="caption">
+            <Typography variant="caption" sx={{ mt:0.5 }}>
               Selected file: {artifactFile.name}
             </Typography>
           )}
         </Grid>
-
         {/* Preview */}
         {artifactDataUrl && (
           <Grid size={12}>
-            <Typography variant="body1">Preview:</Typography>
-            <img
-              src={artifactDataUrl}
-              alt="NFT preview"
-              style={{
-                maxWidth: '100%',
-                maxHeight: 300,
-                marginTop: 10,
-                borderRadius: 8,
-                objectFit: 'contain',
-                backgroundColor: '#f5f5f5',
-              }}
-            />
+            <MintPreview dataUrl={artifactDataUrl} fileName={artifactFile?.name} />
           </Grid>
         )}
 
