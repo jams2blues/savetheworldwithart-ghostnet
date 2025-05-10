@@ -8,7 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
-    "@airgap/beacon-sdk": "^4.5.0",
+    "@airgap/beacon-sdk": "4.5.1",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
     "@emotion/server": "^11.11.0",
@@ -31,6 +31,9 @@
     "@testing-library/dom": "^10.4.0",
     "@types/react": "^19.1.0",
     "react-is": "^19.1.0"
+  },
+  "resolutions": {
+    "@stablelib/*": "1.0.4"
   },
   "packageManager": "yarn@4.9.1"
 }
