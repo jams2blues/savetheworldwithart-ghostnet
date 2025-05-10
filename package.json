@@ -18,6 +18,7 @@
     "@mui/system": "^7.0.1",
     "@taquito/beacon-wallet": "^21.0.4",
     "@taquito/taquito": "^21.0.4",
+    "@stablelib/nacl": "1.0.2",
     "bignumber.js": "^9.2.0",
     "embla-carousel-react": "^8.6.0",
     "jszip": "^3.10.1",
@@ -31,6 +32,9 @@
     "@testing-library/dom": "^10.4.0",
     "@types/react": "^19.1.0",
     "react-is": "^19.1.0"
+  },
+  "resolutions": {
+    "@stablelib/nacl": "1.0.2"
   },
   "packageManager": "yarn@4.9.1"
 }
