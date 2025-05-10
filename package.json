@@ -16,6 +16,7 @@
     "@mui/icons-material": "^7.0.1",
     "@mui/material": "^7.0.1",
     "@mui/system": "^7.0.1",
+    "@stablelib/ed25519": "1.0.2",
     "@stablelib/nacl": "1.0.2",
     "@stablelib/random": "1.0.2",
     "@stablelib/utf8": "1.0.2",
@@ -36,9 +37,7 @@
     "react-is": "^19.1.0"
   },
   "resolutions": {
-    "@stablelib/nacl": "1.0.2",
-    "@stablelib/random": "1.0.2",
-    "@stablelib/utf8": "1.0.2"
+    "@stablelib/*": "1.0.2"
   },
   "packageManager": "yarn@4.9.1"
 }
