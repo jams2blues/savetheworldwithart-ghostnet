@@ -1018,17 +1018,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/ed25519@npm:1.0.2":
-  version: 1.0.2
-  resolution: "@stablelib/ed25519@npm:1.0.2"
-  dependencies:
-    "@stablelib/random": "npm:^1.0.1"
-    "@stablelib/sha512": "npm:^1.0.1"
-    "@stablelib/wipe": "npm:^1.0.1"
-  checksum: 10c0/6f22194bb5d6efbd7524905d431773b0bc6d53dfcedf8fab586f17f444fba68af3decc5ea3f83912ff6ffde7b46993fba6daa49d27ccd946541f5d3d99462869
-  languageName: node
-  linkType: hard
-
 "@stablelib/ed25519@npm:^1.0.3":
   version: 1.0.3
   resolution: "@stablelib/ed25519@npm:1.0.3"
@@ -1063,19 +1052,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/nacl@npm:1.0.2":
-  version: 1.0.2
-  resolution: "@stablelib/nacl@npm:1.0.2"
-  dependencies:
-    "@stablelib/poly1305": "npm:^1.0.1"
-    "@stablelib/random": "npm:^1.0.1"
-    "@stablelib/wipe": "npm:^1.0.1"
-    "@stablelib/x25519": "npm:^1.0.1"
-    "@stablelib/xsalsa20": "npm:^1.0.2"
-  checksum: 10c0/365c963dcf608e787b6fe9dc32a3da6450200d8d34b33e7d2d4d184033c2616720e27f999641e16c13ebc00c2f20a40c5a03905fd539f3592c376f881e2137f4
-  languageName: node
-  linkType: hard
-
 "@stablelib/nacl@npm:^1.0.4":
   version: 1.0.4
   resolution: "@stablelib/nacl@npm:1.0.4"
@@ -1099,7 +1075,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/random@npm:1.0.2, @stablelib/random@npm:^1.0.1, @stablelib/random@npm:^1.0.2":
+"@stablelib/random@npm:^1.0.2":
   version: 1.0.2
   resolution: "@stablelib/random@npm:1.0.2"
   dependencies:
@@ -1131,7 +1107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/utf8@npm:1.0.2, @stablelib/utf8@npm:^1.0.1":
+"@stablelib/utf8@npm:^1.0.1":
   version: 1.0.2
   resolution: "@stablelib/utf8@npm:1.0.2"
   checksum: 10c0/285e20102db831b75fbac3482219287f7c500a9b77f9276148dd7473c4dfcb7e0345c19e5297c95582b2fa556c2c3b133d07ea89c381f9394997bd834bb34ba9
@@ -1158,7 +1134,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/x25519@npm:^1.0.1, @stablelib/x25519@npm:^1.0.3":
+"@stablelib/x25519@npm:^1.0.3":
   version: 1.0.3
   resolution: "@stablelib/x25519@npm:1.0.3"
   dependencies:
@@ -4932,10 +4908,6 @@ __metadata:
     "@mui/icons-material": "npm:^7.0.1"
     "@mui/material": "npm:^7.0.1"
     "@mui/system": "npm:^7.0.1"
-    "@stablelib/ed25519": "npm:1.0.2"
-    "@stablelib/nacl": "npm:1.0.2"
-    "@stablelib/random": "npm:1.0.2"
-    "@stablelib/utf8": "npm:1.0.2"
     "@taquito/beacon-wallet": "npm:^21.0.4"
     "@taquito/taquito": "npm:^21.0.4"
     "@testing-library/dom": "npm:^10.4.0"
