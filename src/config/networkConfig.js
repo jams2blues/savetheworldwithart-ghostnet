@@ -13,6 +13,7 @@ const RPCS = {
     'https://rpc.tzkt.io/ghostnet'            // Baking Bad – high U.S. uptime
   ],
   mainnet: [
+    'https://prod.tcinfra.net/rpc/mainnet',   // Tezos Commons – autoscaling cluster
     'https://mainnet.tezos.ecadinfra.com',    // ECAD Infra (primary)
     'https://rpc.tzkt.io/mainnet',            // Baking Bad
     'https://mainnet.smartpy.io'              // SmartPy – generous CORS

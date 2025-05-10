@@ -19,6 +19,7 @@
     "@taquito/beacon-wallet": "^21.0.4",
     "@taquito/taquito": "^21.0.4",
     "bignumber.js": "^9.2.0",
+    "embla-carousel-react": "^8.6.0",
     "jszip": "^3.10.1",
     "next": "14.2.x",
     "prop-types": "^15.8.1",

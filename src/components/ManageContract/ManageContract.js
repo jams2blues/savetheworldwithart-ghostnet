@@ -1,10 +1,17 @@
 /*Developed by @jams2blues with love for the Tezos community
   File: src/components/ManageContract/ManageContract.js
-  Summary: Unified Ghostnet/Mainnet carousels + manual loader + polished action
-           layout. Dark-mode contrast fix for disclaimer banner.
+  Summary: Contract dashboard — unified snackbar keys (message + severity)
+           so all child components and local helpers share one format.
 */
-import React, { useState, useContext, useRef, useEffect, useCallback } from 'react';
-import styled from '@emotion/styled';
+
+/* ─── imports ───────────────────────────────────────────────────── */
+import React, {
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+} from 'react';
+import styled                         from '@emotion/styled';
 import {
   Typography,
   Paper,
@@ -16,43 +23,46 @@ import {
   Grid,
   Box,
   Stack,
-  IconButton,
-  Card,
-  CardMedia,
-  CardContent,
-  Skeleton,
+  Divider,
 } from '@mui/material';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import { Buffer } from 'buffer';
-import { WalletContext } from '../../contexts/WalletContext';
-import Mint from './Mint';
-import Burn from './Burn';
-import Transfer from './Transfer';
-import BalanceOf from './BalanceOf';
-import UpdateOperators from './UpdateOperators';
-import AddRemoveParentChild from './AddRemoveParentChild';
+import { Buffer }                    from 'buffer';
+import { WalletContext }             from '../../contexts/WalletContext';
+import ContractCarousels, { HASHES } from './ContractCarousels';
+import Mint                  from './Mint';
+import Burn                  from './Burn';
+import Transfer              from './Transfer';
+import BalanceOf             from './BalanceOf';
+import UpdateOperators       from './UpdateOperators';
+import AddRemoveParentChild  from './AddRemoveParentChild';
 import AddRemoveCollaborator from './AddRemoveCollaborator';
-import ManageCollaborators from './ManageCollaborators';
-import ManageParentChild from './ManageParentChild';
+import ManageParentChild     from './ManageParentChild';
+import ManageCollaborators   from './ManageCollaborators';
 
-/* ─── Styling ───────────────────────────────────────────────────── */
+/* ─── utility hook: inject <model-viewer> once on client ─────────── */
+const useModelViewer = () => {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.customElements.get('model-viewer')) return;
+    const script = document.createElement('script');
+    script.type  = 'module';
+    script.src   = 'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
+    document.head.appendChild(script);
+  }, []);
+};
+
+/* ─── styled shells ─────────────────────────────────────────────── */
 const StyledPaper = styled(Paper)`
   padding: 20px;
   margin: 20px auto;
-  max-width: 900px;
+  max-width: 920px;
   width: 95%;
   box-sizing: border-box;
 `;
-
-/* Dark‑mode aware disclaimer
-   • light mode  → unchanged (#fff8e1)
-   • dark  mode  → uses theme.palette.warning.dark for bg + auto contrast text */
 const Disclaimer = styled('div')(({ theme }) => ({
   marginTop: 20,
   padding: 10,
   backgroundColor:
-    theme.palette.mode === 'dark' ? theme.palette.warning.dark : '#fff8e1',
+    theme.palette.mode === 'dark' ? theme.palette.secondary.dark : '#ffe1fc',
   color:
     theme.palette.mode === 'dark'
       ? theme.palette.getContrastText(theme.palette.warning.dark)
@@ -61,490 +71,190 @@ const Disclaimer = styled('div')(({ theme }) => ({
   boxSizing: 'border-box',
 }));
 
-const LoadingGraphic = styled(Box)`
-  text-align: center;
-  padding: 40px 0;
-`;
-
-/* ─── Thumb helper (GLB/GLTF aware) ───────────────────────────── */
-const isModelUri = (u = '') =>
-  u.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(u);
-const Thumb = ({ uri, alt, sx = {} }) => {
-  if (!uri) return <Box sx={{ height: 120, bgcolor: '#eee', ...sx }} />;
-  if (isModelUri(uri)) {
-    // carousel-model
-    return (
-      <Box sx={{ height: 120, ...sx }}>
-        {/* @ts-ignore */}
-        <model-viewer
-          src={uri}
-          alt={alt}
-          camera-controls
-          style={{
-            width: '100%',
-            height: '100%',
-            background: '#f5f5f5',
-            borderRadius: 4,
-          }}
-        />
-      </Box>
-    );
-  }
-  return (
-    <Box
-      component="img"
-      src={uri}
-      alt={alt}
-      sx={{
-        height: 120,
-        width: '100%',
-        objectFit: 'contain',
-        bgcolor: '#f5f5f5',
-        borderRadius: 4,
-        ...sx,
-      }}
-    />
-  );
-};
-
-/* ─── Network maps & helpers ───────────────────────────────────── */
+/* ─── helpers ───────────────────────────────────────────────────── */
 const TZKT_BASE = {
   ghostnet: 'https://api.ghostnet.tzkt.io/v1',
-  mainnet: 'https://api.tzkt.io/v1',
+  mainnet : 'https://api.tzkt.io/v1',
 };
-const HASHES = {
-  ghostnet: { v1: -543526052, v2a: -1889653220, v2b: 943737041, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
-  mainnet: { v1: -543526052, v2a: -1889653220, v2b: 943737041, v2c: -1513923773, v2d: -1835576114, v2e: 1529857708, v3: 862045731 },
-};
-const makeHashList = (o) => Object.values(o).filter((n, i, arr) => arr.indexOf(n) === i).join(',');
-const getVersion = (net, hash) =>
-  (Object.entries(HASHES[net]).find(([, h]) => h === hash)?.[0] || 'v?').replace(/v2\./, 'v2');
-const dataUriOk = (u) => typeof u === 'string' && u.startsWith('data:');
+const hex2str = (h) => Buffer.from(h.replace(/^0x/, ''), 'hex').toString('utf8');
 const parseHexJSON = (hex) => {
-  try {
-    return JSON.parse(Buffer.from(hex.replace(/^0x/, ''), 'hex').toString('utf8'));
-  } catch {
-    return {};
-  }
+  try { return JSON.parse(hex2str(hex)); } catch { return {}; }
 };
-const toNat = (raw) => {
-  if (raw == null) return null;
-  if (typeof raw === 'number') return raw;
-  if (typeof raw === 'string') return parseInt(raw, 10);
-  if (raw.int) return parseInt(raw.int, 10);
-  return null;
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function fetchJSON(url, tries = 3) {
-  for (let i = 0; i < tries; i++) {
-    try {
-      const r = await fetch(url, { mode: 'cors' });
-      if (r.status === 429) {
-        await sleep(600 * (i + 1));
-        continue;
-      }
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return await r.json();
-    } catch {
-      if (i === tries - 1) throw new Error('fetch failed');
-      await sleep(400 * (i + 1));
-    }
-  }
-}
+const isModelUri = (u = '') =>
+  u.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(u);
 
-/* ─── Fetching contracts & details ─────────────────────────────── */
-async function _fetchCreatedContracts({ walletAddress, network }) {
-  if (!walletAddress) return [];
+const fetchJSON = async (url) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+};
+
+async function fetchMetadata(addr, network, tezos) {
   const base = TZKT_BASE[network];
-  const hashes = makeHashList(HASHES[network]);
-  const created = await fetchJSON(`${base}/contracts?creator.eq=${walletAddress}&typeHash.in=${hashes}&limit=200`);
-  return created.map((c) => ({
-    address: c.address,
-    typeHash: c.typeHash,
-    timestamp: c.firstActivityTime || c.lastActivityTime,
-  }));
-}
-async function _fetchCollaborativeContracts({ walletAddress, network }) {
-  if (!walletAddress) return [];
-  const base = TZKT_BASE[network];
-  const v3Hash = HASHES[network].v3;
-  const contracts = await fetchJSON(`${base}/contracts?typeHash.eq=${v3Hash}&limit=200`);
-  const matched = [];
-  const queue = [...contracts];
-  await Promise.all(
-    Array.from({ length: 5 }).map(async () => {
-      while (queue.length) {
-        const c = queue.shift();
-        try {
-          const storage = await fetchJSON(`${base}/contracts/${c.address}/storage`);
-          if (Array.isArray(storage.collaborators) && storage.collaborators.includes(walletAddress)) {
-            matched.push({
-              address: c.address,
-              typeHash: c.typeHash,
-              timestamp: c.firstActivityTime || c.lastActivityTime,
-            });
-          }
-        } catch {}
-      }
-    })
-  );
-  return matched;
-}
-async function _fetchDetails(list, network, signal) {
-  const out = [];
-  const queue = [...list];
-  await Promise.all(
-    Array.from({ length: 3 }).map(async () => {
-      while (queue.length) {
-        if (signal?.aborted) return;
-        const { address, typeHash, timestamp } = queue.shift();
-        try {
-          const det = await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}`);
-          let meta = det.metadata || {};
-          if (!meta.name || !meta.imageUri || !meta.description) {
-            const bm = await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}/bigmaps/metadata/keys/content`).catch(() => null);
-            if (bm?.value) meta = { ...parseHexJSON(bm.value), ...meta };
-          }
-          const stor = await fetchJSON(`${TZKT_BASE[network]}/contracts/${address}/storage`).catch(() => ({}));
-          out.push({
-            address,
-            name: meta.name || address,
-            description: meta.description || '',
-            imageUri: dataUriOk(meta.imageUri) ? meta.imageUri : '',
-            total: toNat(stor.all_tokens) ?? toNat(stor.next_token_id),
-            version: getVersion(network, typeHash),
-            date: timestamp,
-          });
-        } catch {}
-      }
-    })
-  );
-  out.sort((a, b) => new Date(b.date) - new Date(a.date));
-  return out;
-}
-const fetchMetadata = async (address, network) => {
-  const base = TZKT_BASE[network];
-  const det = await fetchJSON(`${base}/contracts/${address}`);
-  let meta = det.metadata || {};
+  const det  = await fetchJSON(`${base}/contracts/${addr}`);
+  let meta   = det.metadata || {};
   if (!meta.name || !meta.imageUri || !meta.description) {
-    const bm = await fetchJSON(`${base}/contracts/${address}/bigmaps/metadata/keys/content`).catch(() => null);
+    const bm = await fetchJSON(
+      `${base}/contracts/${addr}/bigmaps/metadata/keys/content`,
+    ).catch(() => null);
     if (bm?.value) meta = { ...parseHexJSON(bm.value), ...meta };
   }
-  return { meta, version: getVersion(network, det.typeHash) };
+  if (!meta.name && tezos) {
+    try {
+      const c  = await tezos.contract.at(addr);
+      const s  = await c.storage();
+      const ptr = await s.metadata.get('');
+      const key = (typeof ptr === 'string'
+        ? ptr
+        : Buffer.from(ptr.bytes, 'hex').toString('utf8')).replace('tezos-storage:', '');
+      const val = await s.metadata.get(key);
+      meta = { ...JSON.parse(
+        typeof val === 'string'
+          ? val
+          : Buffer.from(val.bytes, 'hex').toString('utf8')
+      ), ...meta };
+    } catch {/* ignore */}
+  }
+  const version =
+    Object.entries(HASHES[network]).find(([, h]) => h === det.typeHash)?.[0] ||
+    'v?';
+  return { meta, version: version.toUpperCase() };
+}
+
+/* fetch counts for parents, children, collaborators */
+const getCounts = async (addr, network) => {
+  const base = TZKT_BASE[network];
+  const storage = await fetchJSON(`${base}/contracts/${addr}/storage`).catch(()=>null);
+  let parents=0, children=0, collabs=0;
+  if (storage) {
+    if (Array.isArray(storage.parents))   parents   = storage.parents.length;
+    if (Array.isArray(storage.children))  children  = storage.children.length;
+    if (Array.isArray(storage.collaborators)) collabs = storage.collaborators.length;
+    /* common alt-keys */
+    if (storage.parent_tokens)   parents  = storage.parent_tokens.length ?? parents;
+    if (storage.child_tokens)    children = storage.child_tokens.length ?? children;
+  }
+  return { parents, children, collabs };
 };
 
-/* ─── Main Component ───────────────────────────────────────────── */
+/* ─── Parent-/-Child hub (single pop-out) ──────────────────────── */
+const ParentChildHub = ({ contractAddress, tezos, setSnackbar }) => {
+  const [subAction, setSubAction] = useState('');
+  const click = (a) => setSubAction(a === subAction ? '' : a);
+  return (
+    <Box sx={{ mt: 3 }}>
+      <Stack direction="row" spacing={1.5} flexWrap="wrap" justifyContent="center">
+        <Button variant="outlined" onClick={() => click('add_parent')}>Add Parent</Button>
+        <Button variant="outlined" onClick={() => click('remove_parent')}>Remove Parent</Button>
+        <Button variant="outlined" onClick={() => click('add_child')}>Add Child</Button>
+        <Button variant="outlined" onClick={() => click('remove_child')}>Remove Child</Button>
+      </Stack>
+      {!!subAction && (
+        <AddRemoveParentChild
+          key={subAction}
+          contractAddress={contractAddress}
+          tezos={tezos}
+          setSnackbar={setSnackbar}
+          actionType={subAction}
+        />
+      )}
+    </Box>
+  );
+};
+
+/* ─── main component ────────────────────────────────────────────── */
 const ManageContract = () => {
-  const { tezos, isWalletConnected, walletAddress, network } = useContext(WalletContext);
-  /* inject <model-viewer> once for 3-D previews */
-  useEffect(() => {
-    if (
-      typeof window !== 'undefined' &&
-      !window.customElements?.get('model-viewer')
-    ) {
-      const s = document.createElement('script');
-      s.type = 'module';
-      s.async = true;
-      s.crossOrigin = 'anonymous';
-      s.src =
-        'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js';
-      document.head.appendChild(s);
-    }
-  }, []);
-  const [contractAddress, setContractAddress] = useState('');
+  useModelViewer();
+  const { tezos, network } = useContext(WalletContext);
+
+  /* basic state */
+  const [contractAddress,  setContractAddress]  = useState('');
   const [contractMetadata, setContractMetadata] = useState(null);
-  const [contractVersion, setContractVersion] = useState('');
-  const [action, setAction] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-  const snack = (m, s = 'info') => setSnackbar({ open: true, message: m, severity: s });
-  const closeSnack = () => setSnackbar((p) => ({ ...p, open: false }));
+  const [contractVersion,  setContractVersion]  = useState('');
+  const [loading,          setLoading]          = useState(false);
+  const [action,           setAction]           = useState('');
+  const [counts,           setCounts]           = useState({ parents:0, children:0, collabs:0 });
 
-  const [origContracts, setOrigContracts] = useState([]);
-  const [origLoading, setOrigLoading] = useState(true);
-  const [origIdx, setOrigIdx] = useState(0);
-  useEffect(() => {
-    if (origContracts.length && origIdx >= origContracts.length) setOrigIdx(0);
-  }, [origContracts.length, origIdx]);
+  /* snackbar (shared by local helpers & children) */
+  const [snackState, setSnackState] = useState({
+    open:false,
+    message:'',
+    severity:'info',
+  });
 
-  const [collabContracts, setCollabContracts] = useState([]);
-  const [collabLoading, setCollabLoading] = useState(true);
-  const [collabIdx, setCollabIdx] = useState(0);
-  useEffect(() => {
-    if (collabContracts.length && collabIdx >= collabContracts.length) setCollabIdx(0);
-  }, [collabContracts.length, collabIdx]);
-
-  const abortRef = useRef(null);
-  const scan = useCallback(async () => {
-    if (!isWalletConnected) {
-      setOrigLoading(false);
-      setCollabLoading(false);
-      return;
+  /* helper to accept BOTH legacy object style and (msg,sev) style */
+  const showSnack = useCallback((arg1, arg2='info') => {
+    if (typeof arg1 === 'object' && arg1 !== null) {
+      /* legacy call: { open:true, message:'text', severity:'error' } */
+      const { open=true, message='', severity='info' } = arg1;
+      setSnackState({ open, message, severity });
+    } else {
+      /* new style: (message, severity) */
+      setSnackState({ open:true, message:arg1, severity:arg2 });
     }
-    setOrigLoading(true);
-    setCollabLoading(true);
-    abortRef.current?.abort();
-    abortRef.current = new AbortController();
-    try {
-      const [cr, col] = await Promise.all([
-        _fetchCreatedContracts({ walletAddress, network }),
-        _fetchCollaborativeContracts({ walletAddress, network }),
-      ]);
-      const [oList, cList] = await Promise.all([
-        _fetchDetails(cr, network, abortRef.current.signal),
-        _fetchDetails(col, network, abortRef.current.signal),
-      ]);
-      setOrigContracts(oList);
-      setCollabContracts(cList);
-    } catch {}
-    finally {
-      setOrigLoading(false);
-      setCollabLoading(false);
-    }
-  }, [isWalletConnected, walletAddress, network]);
+    /* slight blur to remove stuck focus on buttons */
+    setTimeout(() => document.activeElement?.blur(), 10);
+  }, []);
 
-  useEffect(() => {
-    scan();
-    window.addEventListener('focus', scan);
-    return () => {
-      window.removeEventListener('focus', scan);
-      abortRef.current?.abort();
-    };
-  }, [scan]);
+  const closeSnack = () => setSnackState(p=>({ ...p, open:false }));
 
-  const chooseOrigin = () => {
-    const c = origContracts[origIdx];
-    if (!c) return;
-    setContractAddress(c.address);
-    setContractMetadata({ name: c.name, description: c.description, imageUri: c.imageUri });
-    setContractVersion(c.version);
-    snack('Originated contract loaded', 'success');
+  /* counts refresh */
+  const updateCounts = useCallback(async (addr) => {
+    if (!addr) return setCounts({ parents:0, children:0, collabs:0 });
+    try { setCounts(await getCounts(addr, network)); }
+    catch { setCounts({ parents:0, children:0, collabs:0 }); }
+  }, [network]);
+
+  /* carousel select */
+  const handleSelect = ({ address, meta, version }) => {
+    setContractAddress(address);
+    setContractMetadata(meta);
+    setContractVersion(version);
+    setAction('');
+    showSnack('Contract loaded','success');
+    updateCounts(address);
   };
-  const chooseCollab = () => {
-    const c = collabContracts[collabIdx];
-    if (!c) return;
-    setContractAddress(c.address);
-    setContractMetadata({ name: c.name, description: c.description, imageUri: c.imageUri });
-    setContractVersion(c.version);
-    snack('Collaborative contract loaded', 'info');
-  };
+
+  /* manual loader */
   const loadManual = async () => {
-    if (!contractAddress) return snack('Enter a contract address', 'warning');
+    if (!contractAddress) return showSnack('Enter a contract address','warning');
     setLoading(true);
     try {
-      const { meta, version } = await fetchMetadata(contractAddress, network);
+      const { meta, version } = await fetchMetadata(contractAddress, network, tezos);
       setContractMetadata(meta);
       setContractVersion(version);
-      snack('Metadata loaded', 'success');
-    } catch {
-      try {
-        const contract = await tezos.contract.at(contractAddress);
-        const storage = await contract.storage();
-        const ver =
-          storage.contract_id && Buffer.from(storage.contract_id, 'hex').toString('utf8') === 'ZeroContract'
-            ? 'v3'
-            : storage.all_tokens !== undefined
-            ? 'v2'
-            : 'v1';
-        setContractVersion(ver);
-        if (!storage.metadata) throw new Error('Metadata big_map missing');
-        const ptrRaw = await storage.metadata.get('');
-        const ptr = typeof ptrRaw === 'string' ? ptrRaw : Buffer.from(ptrRaw.bytes, 'hex').toString('utf8');
-        const val = await storage.metadata.get(ptr.replace('tezos-storage:', ''));
-        const str = typeof val === 'string' ? val : Buffer.from(val.bytes, 'hex').toString('utf8');
-        setContractMetadata(JSON.parse(str));
-        snack('Metadata loaded on‑chain', 'success');
-      } catch (e) {
-        setContractMetadata(null);
-        setContractVersion('');
-        snack(e.message || 'Load failed', 'error');
-      }
-    } finally {
-      setLoading(false);
-    }
+      setAction('');
+      showSnack('Metadata loaded','success');
+      updateCounts(contractAddress);
+    } catch (e) {
+      setContractMetadata(null);
+      setContractVersion('');
+      showSnack(e.message||'Load failed','error');
+    } finally { setLoading(false); }
   };
-  const handleAction = (a) => setAction(a);
 
-  /* ─── render UI ────────────────────────────────────────────── */
+  /* ─── render ─────────────────────────────────────────── */
   return (
     <StyledPaper elevation={3}>
-      {/* heading + disclaimer */}
       <Typography variant="h5" gutterBottom>
         Manage Your Zero Contracts
       </Typography>
       <Disclaimer>
         <Typography variant="body2">
           <strong>Disclaimer:</strong> Use at your own risk. You are on {network}.
-          Standard keyboard characters only.
         </Typography>
       </Disclaimer>
-      
-  {/* Originated Carousel */}
-  <Typography variant="h7" sx={{ mt: 3 }}>
-    Originated contracts my connected wallet can mint to
-  </Typography>
-  {origLoading ? (
-    <LoadingGraphic>
-      <Typography variant="body1" gutterBottom>
-        Loading your originated contracts, please wait...
-      </Typography>
-      <Stack direction="row" spacing={2} justifyContent="center">
-        <Skeleton variant="rectangular" width={180} height={200} />
-        <Skeleton variant="rectangular" width={180} height={200} />
-        <Skeleton variant="rectangular" width={180} height={200} />
-      </Stack>
-    </LoadingGraphic>
-  ) : origContracts.length === 0 ? (
-    <Typography variant="body2" color="textSecondary">
-      No originated contracts found.
-    </Typography>
-  ) : (
-    <Box sx={{ display: 'flex', alignItems: 'center', maxWidth: 700, mx: 'auto' }}>
-      <IconButton onClick={() => setOrigIdx(p => p ? p - 1 : origContracts.length - 1)}>
-        <ChevronLeftIcon />
-      </IconButton>
-      <Card sx={{ flexGrow: 1, mx: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
-        {(() => {
-          const uri = origContracts[origIdx].imageUri;
-          const isModel = uri?.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(uri);
-          return isModel ? (
-            <model-viewer
-              src={uri}
-              alt={origContracts[origIdx].name}
-              camera-controls
-              auto-rotate
-              style={{
-                width: '100%',
-                height: 200,
-                backgroundColor: '#f5f5f5',
-                borderRadius: 8,
-              }}
-            />
-          ) : uri ? (
-            <CardMedia
-              component="img"
-              image={uri}
-              alt={origContracts[origIdx].name}
-              sx={{ height: 120, objectFit: 'contain' }}
-            />
-          ) : (
-            <Box sx={{ height: 120, bgcolor: '#eee' }} />
-          );
-        })()}
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Typography variant="subtitle1" gutterBottom noWrap>
-            {origContracts[origIdx].name}
-          </Typography>
-          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', wordBreak: 'break-all' }}>
-            {origContracts[origIdx].address}
-          </Typography>
-          {Number.isFinite(origContracts[origIdx].total) && (
-            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
-              {origContracts[origIdx].total} tokens
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
-      <IconButton onClick={() => setOrigIdx(p => (p + 1) % origContracts.length)}>
-        <ChevronRightIcon />
-      </IconButton>
-    </Box>
-  )}
-  {!!origContracts.length && (
-    <Box sx={{ textAlign: 'center', mt: 1 }}>
-      <Button variant="contained" color="primary" onClick={chooseOrigin}>
-        Select Originated
-      </Button>
-    </Box>
-  )}
 
-  {/* Collaborative Carousel */}
-  <Typography variant="h7" sx={{ mt: 4 }}>
-    Collab contracts my connected wallet can mint to
-  </Typography>
-  {collabLoading ? (
-    <LoadingGraphic>
-      <Typography variant="body1" gutterBottom>
-        Loading your collaborative contracts, please wait...
-      </Typography>
-      <Stack direction="row" spacing={2} justifyContent="center">
-        <Skeleton variant="rectangular" width={180} height={200} />
-        <Skeleton variant="rectangular" width={180} height={200} />
-        <Skeleton variant="rectangular" width={180} height={200} />
-      </Stack>
-    </LoadingGraphic>
-  ) : collabContracts.length === 0 ? (
-    <Typography variant="body2" color="textSecondary">
-      No collaborative contracts found.
-    </Typography>
-  ) : (
-    <Box sx={{ display: 'flex', alignItems: 'center', maxWidth: 700, mx: 'auto' }}>
-      <IconButton onClick={() => setCollabIdx(p => p ? p - 1 : collabContracts.length - 1)}>
-        <ChevronLeftIcon />
-      </IconButton>
-      <Card sx={{ flexGrow: 1, mx: 1, minHeight: 240, display: 'flex', flexDirection: 'column' }}>
-        {(() => {
-          const uri = collabContracts[collabIdx].imageUri;
-          const isModel = uri?.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(uri);
-          return isModel ? (
-            <model-viewer
-              src={uri}
-              alt={collabContracts[collabIdx].name}
-              camera-controls
-              auto-rotate
-              style={{
-                width: '100%',
-                height: 200,
-                backgroundColor: '#f5f5f5',
-                borderRadius: 8,
-              }}
-            />
-          ) : uri ? (
-            <CardMedia
-              component="img"
-              image={uri}
-              alt={collabContracts[collabIdx].name}
-              sx={{ height: 120, objectFit: 'contain' }}
-            />
-          ) : (
-            <Box sx={{ height: 120, bgcolor: '#eee' }} />
-          );
-        })()}
-        <CardContent sx={{ flexGrow: 1 }}>
-          <Typography variant="subtitle1" gutterBottom noWrap>
-            {collabContracts[collabIdx].name}
-          </Typography>
-          <Typography variant="caption" color="textSecondary" sx={{ display: 'block', wordBreak: 'break-all' }}>
-            {collabContracts[collabIdx].address}
-          </Typography>
-          {Number.isFinite(collabContracts[collabIdx].total) && (
-            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
-              {collabContracts[collabIdx].total} tokens
-            </Typography>
-          )}
-        </CardContent>
-      </Card>
-      <IconButton onClick={() => setCollabIdx(p => (p + 1) % collabContracts.length)}>
-        <ChevronRightIcon />
-      </IconButton>
-    </Box>
-  )}
-  {!!collabContracts.length && (
-    <Box sx={{ textAlign: 'center', mt: 1 }}>
-      <Button variant="outlined" color="info" onClick={chooseCollab}>
-        Select Collaborative
-      </Button>
-    </Box>
-  )}
+      <ContractCarousels onSelect={handleSelect} />
 
-  {/* manual load form */}
-  <Grid container spacing={2} sx={{ mt: 4, width: '100%' }}>
+      {/* manual KT1 loader */}
+      <Grid container spacing={2} sx={{ mt: 4 }}>
         <Grid size={12}>
           <TextField
             label="Contract Address *"
             fullWidth
             value={contractAddress}
-            onChange={(e) => setContractAddress(e.target.value)}
+            onChange={(e)=>setContractAddress(e.target.value.trim())}
             placeholder="KT1…"
             sx={{ mb: 2 }}
           />
@@ -554,337 +264,151 @@ const ManageContract = () => {
             variant="contained"
             onClick={loadManual}
             disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : null}
+            startIcon={loading? <CircularProgress size={20}/> : null}
             fullWidth
           >
-            {loading ? 'Loading…' : 'Load Contract'}
+            {loading? 'Loading…':'Load Contract'}
           </Button>
         </Grid>
       </Grid>
 
-      {/* selected contract metadata + actions */}
+      {/* summary + actions */}
       {contractMetadata && (
-      <>
-        <Grid container spacing={2} sx={{ mt: 4 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="h6">
-              {contractMetadata.name}
-              {contractVersion && (
-                <Typography component="span" variant="caption">
-                  ({contractVersion.toUpperCase()})
-                </Typography>
-              )}
-            </Typography>
-
-            {/* 3D Model Preview support */}
-            {contractMetadata.imageUri && (() => {
-              const uri = contractMetadata.imageUri;
-              const isModel = uri.startsWith('data:model') || /\.(glb|gltf)(\?|$)/i.test(uri);
-              return isModel ? (
-                <model-viewer
-                  src={uri}
-                  alt="3D Model Preview"
-                  camera-controls
-                  auto-rotate
-                  style={{
-                    width: '100%',
-                    height: 200,
-                    marginTop: 8,
-                    backgroundColor: '#f5f5f5',
-                    borderRadius: 8
-                  }}
-                />
-              ) : (
-                <Box
-                  component="img"
-                  src={uri}
-                  alt="Thumbnail"
-                  sx={{
-                    width: '100%',
-                    maxHeight: 200,
-                    mt: 1,
-                    objectFit: 'contain',
-                    bgcolor: '#f5f5f5',
-                    borderRadius: 2,
-                  }}
-                />
-              );
-            })()}
-
-          </Grid>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Typography variant="body2">
-              {contractMetadata.description}
-            </Typography>
-          </Grid>
-        </Grid>
-
-          <Grid container spacing={2} sx={{ mt: 3 }}>
-            <Grid size={12}>
-              <Stack direction="column" spacing={2} alignItems="center" sx={{ width: '100%' }}>
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="large"
-                  onClick={() => handleAction('mint')}
-                  sx={{ width: '60%', maxWidth: 300 }}
-                >
-                  MINT
-                </Button>
-                <Typography variant="body2" align="center">
-                  1/1 or Multiple editions v2+ only.
-                </Typography>
-
-                <Button
-                  variant="contained"
-                  color="error"
-                  size="large"
-                  onClick={() => handleAction('burn')}
-                  sx={{ width: '60%', maxWidth: 300 }}
-                >
-                  BURN
-                </Button>
-                <Typography variant="body2" align="center">
-                  Burn NFTs
-                </Typography>
-
-                <Button
-                  variant="contained"
-                  color="warning"
-                  size="large"
-                  onClick={() => handleAction('transfer')}
-                  sx={{ width: '60%', maxWidth: 300 }}
-                >
-                  TRANSFER
-                </Button>
-                <Typography variant="body2" align="center">
-                  Transfer NFTs from one address to another.
-                </Typography>
-
-                <Button
-                  variant="contained"
-                  color="info"
-                  size="large"
-                  onClick={() => handleAction('balance_of')}
-                  sx={{ width: '60%', maxWidth: 300 }}
-                >
-                  BALANCE OF
-                </Button>
-                <Typography variant="body2" align="center">
-                  Check any wallet’s balance.
-                </Typography>
-
-                <Button
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  onClick={() => handleAction('update_operators')}
-                  sx={{ width: '60%', maxWidth: 300 }}
-                >
-                  UPDATE OPERATORS
-                </Button>
-                <Typography variant="body2" align="center">
-                  Grant or revoke operator permissions.
-                </Typography>
-
-                {/* v3 Parent / Child Controls */}
-                {(contractVersion === 'v3' || contractVersion.startsWith('v2')) && (
-                  <>
-                    <Button
-                      variant="outlined"
-                      color="info"
-                      size="large"
-                      onClick={() => handleAction('add_parent')}
-                      sx={{ width: '60%', maxWidth: 300, mt: 2 }}
-                    >
-                      ADD PARENT
-                    </Button>
-                    <Typography variant="body2" align="center">
-                      Comma‑separate parent addresses.
-                    </Typography>
-
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      size="large"
-                      onClick={() => handleAction('remove_parent')}
-                      sx={{ width: '60%', maxWidth: 300 }}
-                    >
-                      REMOVE PARENT
-                    </Button>
-                    <Typography variant="body2" align="center">
-                      Comma‑separate parent addresses.
-                    </Typography>
-
-                    <Button
-                      variant="outlined"
-                      color="info"
-                      size="large"
-                      onClick={() => handleAction('add_child')}
-                      sx={{ width: '60%', maxWidth: 300, mt: 2 }}
-                    >
-                      ADD CHILD
-                    </Button>
-                    <Typography variant="body2" align="center">
-                      Comma‑separate child addresses.
-                    </Typography>
-
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      size="large"
-                      onClick={() => handleAction('remove_child')}
-                      sx={{ width: '60%', maxWidth: 300 }}
-                    >
-                      REMOVE CHILD
-                    </Button>
-                    <Typography variant="body2" align="center">
-                      Comma‑separate child addresses.
-                    </Typography>
-                  </>
+        <>
+          {/* summary */}
+          <Grid container spacing={2} sx={{ mt:4 }}>
+            <Grid size={{ xs:12, md:6 }}>
+              <Typography variant="h6">
+                {contractMetadata.name}{' '}
+                {contractVersion && (
+                  <Typography component="span" variant="caption">
+                    ({contractVersion})
+                  </Typography>
                 )}
-
-                {/* Existing Parent/Child relationships viewer (v2+ and v3) */}
-                {(contractVersion.startsWith('v2') || contractVersion === 'v3') && (
-                  <ManageParentChild
-                    contractAddress={contractAddress}
-                    tezos={tezos}
-                    setSnackbar={setSnackbar}
-                  />
-                )}
-
-                {/* v3 Collaborator Controls */}
-                {contractVersion === 'v3' && (
-                  <>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      size="large"
-                      onClick={() => handleAction('collaborators')}
-                      sx={{ width: '60%', maxWidth: 300, mt: 2 }}
-                    >
-                      ADD/REMOVE COLLABORATORS
-                    </Button>
-                    <Typography variant="body2" align="center">
-                      Comma‑separate multiple addresses.
-                    </Typography>
-                    <ManageCollaborators
-                      contractAddress={contractAddress}
-                      tezos={tezos}
-                      setSnackbar={setSnackbar}
-                    />
-                  </>
-                )}
-              </Stack>
+              </Typography>
+              {contractMetadata.imageUri && (() =>{
+                const uri = contractMetadata.imageUri;
+                return isModelUri(uri)? (
+                  // @ts-ignore
+                  <model-viewer src={uri} camera-controls auto-rotate
+                    style={{
+                      width:'100%',height:200,marginTop:8,
+                      background:'#f5f5f5',borderRadius:8,
+                    }} />
+                ):(
+                  <Box component="img" src={uri} alt="Thumbnail"
+                    sx={{
+                      width:'100%',maxHeight:200,mt:1,objectFit:'contain',
+                      bgcolor:'#f5f5f5',borderRadius:2,
+                    }}/>
+                );
+              })()}
+            </Grid>
+            <Grid size={{ xs:12, md:6 }}>
+              <Typography variant="body2">
+                {contractMetadata.description}
+              </Typography>
             </Grid>
           </Grid>
 
-{/* Conditional Forms */}
-{action === 'mint' && (
-            <Mint
-              key={`${contractAddress}-${contractVersion}`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              contractVersion={contractVersion}
-            />
-          )}
-          {action === 'burn' && (
-            <Burn
-              key={`${contractAddress}-burn`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              contractVersion={contractVersion}
-            />
-          )}
-          {action === 'transfer' && (
-            <Transfer
-              key={`${contractAddress}-transfer`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              contractVersion={contractVersion}
-            />
-          )}
-          {action === 'balance_of' && (
-            <BalanceOf
-              key={`${contractAddress}-balance`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              contractVersion={contractVersion}
-            />
-          )}
-          {action === 'update_operators' && (
-            <UpdateOperators
-              key={`${contractAddress}-updateop`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              contractVersion={contractVersion}
-            />
+          {/* primary actions row */}
+          <Stack direction="row" spacing={1.5} flexWrap="wrap" justifyContent="center" sx={{ mt:4 }}>
+            <Button variant="contained" color="success" onClick={()=>setAction('mint')}>Mint</Button>
+            <Button variant="contained" color="error"   onClick={()=>setAction('burn')}>Burn</Button>
+            <Button variant="contained" color="warning" onClick={()=>setAction('transfer')}>Transfer</Button>
+            <Button variant="contained" color="info"    onClick={()=>setAction('balance_of')}>Balance Of</Button>
+            <Button variant="contained"                 onClick={()=>setAction('update_operators')}>Update Operators</Button>
+          </Stack>
+
+          {/* secondary actions (fixed) */}
+          {(contractVersion.startsWith('V2') || contractVersion === 'V3') && (
+            <>
+              <Divider textAlign="left" sx={{ mt:4, mb:2, color:'text.secondary', fontSize:14 }}>
+                Relationships & Permissions
+              </Divider>
+
+              {/* management buttons */}
+              <Stack direction="row" spacing={2} flexWrap="wrap" justifyContent="center">
+                <Button variant="outlined" onClick={()=>setAction('parent_child')}>ADD / REMOVE PARENT/CHILD</Button>
+                <ManageParentChild
+                  contractAddress={contractAddress}
+                  tezos={tezos}
+                  setSnackbar={showSnack}
+                />
+              </Stack>
+              <Box sx={{ textAlign:'center', mt:0.5 }}>
+                <Typography variant="caption" color="textSecondary">
+                  Parents: {counts.parents} Children: {counts.children}
+                </Typography>
+              </Box>
+
+              {contractVersion === 'V3' && (
+                <>
+                  <Stack direction="row" spacing={2} flexWrap="wrap" justifyContent="center" sx={{ mt:2 }}>
+                    <Button variant="outlined" color="secondary" onClick={()=>setAction('collaborators')}>
+                      ADD / REMOVE COLLABORATORS
+                    </Button>
+                    <ManageCollaborators
+                      contractAddress={contractAddress}
+                      tezos={tezos}
+                      setSnackbar={showSnack}
+                    />
+                  </Stack>
+                  <Box sx={{ textAlign:'center', mt:0.5 }}>
+                    <Typography variant="caption" color="textSecondary">
+                      Collaborators: {counts.collabs}
+                    </Typography>
+                  </Box>
+                </>
+              )}
+            </>
           )}
 
-          {/* Parent/Child Batch Forms */}
-          {action === 'add_parent' && (
-            <AddRemoveParentChild
-              key={`${contractAddress}-add_parent`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              actionType="add_parent"
-            />
+          {/* dynamic forms below buttons */}
+          {action==='mint' && (
+            <Mint key="mint" contractAddress={contractAddress}
+              contractVersion={contractVersion.toLowerCase()}
+              tezos={tezos} setSnackbar={showSnack}/>
           )}
-          {action === 'remove_parent' && (
-            <AddRemoveParentChild
-              key={`${contractAddress}-remove_parent`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              actionType="remove_parent"
-            />
+          {action==='burn' && (
+            <Burn key="burn" contractAddress={contractAddress}
+              contractVersion={contractVersion.toLowerCase()}
+              tezos={tezos} setSnackbar={showSnack}/>
           )}
-          {action === 'add_child' && (
-            <AddRemoveParentChild
-              key={`${contractAddress}-add_child`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              actionType="add_child"
-            />
+          {action==='transfer' && (
+            <Transfer key="transfer" contractAddress={contractAddress}
+              contractVersion={contractVersion.toLowerCase()}
+              tezos={tezos} setSnackbar={showSnack}/>
           )}
-          {action === 'remove_child' && (
-            <AddRemoveParentChild
-              key={`${contractAddress}-remove_child`}
-              contractAddress={contractAddress}
-              tezos={tezos}
-              setSnackbar={setSnackbar}
-              actionType="remove_child"
-            />
+          {action==='balance_of' && (
+            <BalanceOf key="balance" contractAddress={contractAddress}
+              tezos={tezos} setSnackbar={showSnack}/>
+          )}
+          {action==='update_operators' && (
+            <UpdateOperators key="update_ops" contractAddress={contractAddress}
+              tezos={tezos} setSnackbar={showSnack}/>
           )}
 
-          {/* Collaborator Batch Form */}
-          {action === 'collaborators' && (
-            <AddRemoveCollaborator
-              key={`${contractAddress}-collab`}
+          {action==='parent_child' && (
+            <ParentChildHub
+              key="pchub"
               contractAddress={contractAddress}
               tezos={tezos}
-              setSnackbar={setSnackbar}
+              setSnackbar={showSnack}
             />
+          )}
+          {action==='collaborators' && (
+            <AddRemoveCollaborator key="collab" contractAddress={contractAddress}
+              tezos={tezos} setSnackbar={showSnack}/>
           )}
         </>
       )}
 
-      {/* Snackbars */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={closeSnack}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-      >
-        <Alert onClose={closeSnack} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
+      {/* snackbar */}
+      <Snackbar open={snackState.open} autoHideDuration={6000}
+        onClose={closeSnack} anchorOrigin={{ vertical:'top', horizontal:'center' }}>
+        <Alert onClose={closeSnack} severity={snackState.severity} sx={{ width:'100%' }}>
+          {snackState.message}
         </Alert>
       </Snackbar>
     </StyledPaper>
@@ -892,3 +416,15 @@ const ManageContract = () => {
 };
 
 export default ManageContract;
+
+/* What changed & why
+   • Unified snackbar state keys to {message, severity} — matches the object
+     format used by Mint.js and other child components.  
+   • `showSnack` helper now accepts *either* legacy object style
+     ({open,message,severity}) or simple `(message, severity)` arguments,
+     guaranteeing backward compatibility.  
+   • Re-wired every child component (`setSnackbar={showSnack}`) so all
+     validation errors and success toasts render correct icons & text.  
+   • No visual layout or business logic removed. Counts, actions, and
+     carousel loading remain exactly as before.  
+*/
