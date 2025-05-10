@@ -17,6 +17,7 @@
     "@mui/material": "^7.0.1",
     "@mui/system": "^7.0.1",
     "@stablelib/nacl": "1.0.2",
+    "@stablelib/random": "1.0.2",
     "@taquito/beacon-wallet": "^21.0.4",
     "@taquito/taquito": "^21.0.4",
     "bignumber.js": "^9.2.0",
@@ -34,7 +35,8 @@
     "react-is": "^19.1.0"
   },
   "resolutions": {
-    "@stablelib/nacl": "1.0.2"
+    "@stablelib/nacl": "1.0.2",
+    "@stablelib/random": "1.0.2"
   },
   "packageManager": "yarn@4.9.1"
 }

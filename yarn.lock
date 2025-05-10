@@ -1075,7 +1075,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/random@npm:^1.0.1, @stablelib/random@npm:^1.0.2":
+"@stablelib/random@npm:1.0.2":
   version: 1.0.2
   resolution: "@stablelib/random@npm:1.0.2"
   dependencies:
@@ -4909,6 +4909,7 @@ __metadata:
     "@mui/material": "npm:^7.0.1"
     "@mui/system": "npm:^7.0.1"
     "@stablelib/nacl": "npm:1.0.2"
+    "@stablelib/random": "npm:1.0.2"
     "@taquito/beacon-wallet": "npm:^21.0.4"
     "@taquito/taquito": "npm:^21.0.4"
     "@testing-library/dom": "npm:^10.4.0"
