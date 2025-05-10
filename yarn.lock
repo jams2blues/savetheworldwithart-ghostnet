@@ -1107,7 +1107,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@stablelib/utf8@npm:^1.0.1":
+"@stablelib/utf8@npm:1.0.2":
   version: 1.0.2
   resolution: "@stablelib/utf8@npm:1.0.2"
   checksum: 10c0/285e20102db831b75fbac3482219287f7c500a9b77f9276148dd7473c4dfcb7e0345c19e5297c95582b2fa556c2c3b133d07ea89c381f9394997bd834bb34ba9
@@ -4910,6 +4910,7 @@ __metadata:
     "@mui/system": "npm:^7.0.1"
     "@stablelib/nacl": "npm:1.0.2"
     "@stablelib/random": "npm:1.0.2"
+    "@stablelib/utf8": "npm:1.0.2"
     "@taquito/beacon-wallet": "npm:^21.0.4"
     "@taquito/taquito": "npm:^21.0.4"
     "@testing-library/dom": "npm:^10.4.0"
