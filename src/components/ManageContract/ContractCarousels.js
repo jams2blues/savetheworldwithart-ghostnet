@@ -171,13 +171,22 @@ import React, {
             <model-viewer src={contract.imageUri} camera-controls auto-rotate style={{width:'100%',height:160,background:'#f5f5f5',borderBottom:'1px solid #ddd'}}/>:
             <CardMedia component="img" image={contract.imageUri} alt={contract.name} sx={{height:160,objectFit:'contain'}}/>
           ):<Box sx={{height:160,bgcolor:'#eee'}}/>}
-          <CardContent sx={{p:1.2}}>
+          <CardContent sx={{ p: 1.2 }}>
             <Typography variant="subtitle2" noWrap>{contract.name}</Typography>
-            <Typography variant="caption" sx={{wordBreak:'break-all'}}>{contract.address}</Typography>
-            {Number.isFinite(contract.total)&&<Typography variant="caption" color="textSecondary">{contract.total} tokens</Typography>}
-            <Typography variant="caption" sx={{position:'absolute',top:4,left:4+32,bgcolor:'primary.main',color:'background.paper',px:0.5,borderRadius:1,fontSize:'0.7rem',lineHeight:1}}>
-              {contract.version}
+            {/* address (second line) */}
+            <Typography variant="caption" sx={{ wordBreak: 'break-all' }}>
+              {contract.address}
             </Typography>
+            {/* total-tokens */}
+            {Number.isFinite(contract.total) && (
+              <Typography
+                variant="caption"
+                color="textSecondary"
+                sx={{ ml: 3.5 }}
+              >
+                {contract.total} tokens
+              </Typography>
+            )}
           </CardContent>
         </Card>
       </Slide>
